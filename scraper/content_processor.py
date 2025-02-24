@@ -1,6 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
-from  urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 
 
 class ParsingError(Exception):
@@ -10,7 +10,7 @@ class ParsingError(Exception):
     pass
 
 
-class ContentProcessor:
+class PageProcessor:
     """
     A class to process and extract information from web content.
 
@@ -23,7 +23,7 @@ class ContentProcessor:
         self.link = link
 
         parsed_url = urlparse(link)
-        self.link_base = f"{parsed_url.scheme}://{parsed_url.netloc}"
+        self.link_base = parsed_url.netloc
 
         self.protected = protected
         self.content = self._get_content()
@@ -60,17 +60,31 @@ class ContentProcessor:
         Parses the HTML content and extracts all hyperlinks.
 
         Returns:
-            list: A list of URLs extracted from <a> tags in the HTML content.
+            (internal_links list, external_links list): A list of URLs extracted from <a> tags in the HTML content.
         """
         html = self.content
         if html is None:
             return []
         soup = BeautifulSoup(html, 'html.parser')
 
-        links = [a['href'] if "https://" in a["href"] else self.link_base + a["href"] for a in soup.find_all('a', href=True)]
+        links = []
+        for a in soup.find_all('a', href=True):
+            href = a['href'].strip()
+            # Skip empty, anchor-only, javascript, or mailto links
+            if not href or href.startswith("#") or href.startswith("javascript:") or href.startswith("mailto:"):
+                continue
+            absolute_url = urljoin(self.link, href)
+            links.append(absolute_url)
 
-        internal_links = [link for link in links if self.link_base in link]
-
-        external_links = [link for link in links if self.link_base not in link]
+        internal_links = []
+        external_links = []
+        for link in links:
+            parsed = urlparse(link)
+            if parsed.scheme not in ['http', 'https']:
+                continue
+            if parsed.netloc == self.link_base:
+                internal_links.append(link)
+            else:
+                external_links.append(link)
 
         return internal_links, external_links
