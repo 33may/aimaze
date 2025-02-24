@@ -1,10 +1,10 @@
-import requests
-from requests import get
+from requests import get, RequestException
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, urljoin
 from markdownify import markdownify as md
 from urllib.parse import urljoin
 
+from time import sleep
 
 class ParsingError(Exception):
     """
@@ -12,71 +12,57 @@ class ParsingError(Exception):
     """
     pass
 
+
+def bfs_site(starting_url: str, auth_info=None, slowdown_s: float = 0.05) -> dict[str, str]:
+    "Returns all pages found on the given site labeled by URL."
+    
+    pages = dict()
+    links = {starting_url}  # Sets so duplicates get filtered automatically.
+    
+    base_url = urljoin(starting_url, "/")
+
+    while links:
+        link = links.pop()
+        
+        if link in pages:
+            continue  # Filtering bandaid.
+
+        print("Processing", link)
+
+        html = get_content(link, auth_info)
+        if not html:
+            continue  # Skipping failed pages (find better way to handle this).
+
+        pages[link] = html_to_md(html)
+
+        # Add new links which aren't already processed.
+        links |= get_all_links(html, base_url) ^ set(pages.keys())
+
+        sleep(slowdown_s)  # So we don't accidentaly DoS the docs.
+    return pages
+
+def get_content(url: str, auth_info=None) -> str:
+    try:
+        r = get(url)
+
+        if not r.status_code == 200:
+            print(f"Couldn't access page: {url} (HTTP {r.status_code})")  
+            
+            return ""
+
+        return r.content
+    except RequestException as e:
+        print(f"Error fetching content from {self.link}: {e}")
+        # raise ParsingError
+
 def html_to_md(html: str) -> str:
     return md(html)
 
-class PageProcessor:
-    """
-    A class to process and extract information from web content.
+def get_all_links(html: str, base_url: str, internal_only=True) -> set[str]:
+    soup = BeautifulSoup(html, 'html.parser')
 
-    Attributes:
-        link (str): The URL of the web page to process.
-        protected (bool): A flag indicating whether the page is protected and might require special handling.
-    """
+    # '/page/1#Header-2' -> 'https://full-url.com/page/1' (and doesn't fuck up on already full URLs.)
+    links = {urljoin(base_url, a.get('href')).split('#')[0] for a in soup.find_all('a')}
 
-    def __init__(self, link, protected=False):
-        self.link = link
+    return {l for l in links if l.startswith(base_url)} if internal_only else links
 
-        parsed_url = urlparse(link)
-        self.link_base = parsed_url.netloc
-
-        self.protected = protected
-        self.content = self._get_content()
-
-
-    def _get_content(self) -> str:
-        try:
-            r = get(self.link)
-
-            if not r.status_code == 200:
-                raise ParsingError(f"Couldn't access page: {self.link} (HTTP {r.status_code})")  # TODO: Better way to handle this than nuke button.
-
-            return r.content
-        except requests.RequestException as e:
-            print(f"Error fetching content from {self.link}: {e}")
-            raise ParsingError
-
-
-    def get_all_links(self):
-        """
-        Parses the HTML content and extracts all hyperlinks.
-
-        Returns:
-            (internal_links list, external_links list): A list of URLs extracted from <a> tags in the HTML content.
-        """
-        html = self.content
-        if html is None:
-            return []
-        soup = BeautifulSoup(html, 'html.parser')
-
-        links = []
-        for a in soup.find_all('a', href=True):
-            href = a['href'].strip()
-            # Skip empty, anchor-only, javascript, or mailto links
-            if not href or href.startswith("#") or href.startswith("javascript:") or href.startswith("mailto:"):
-                continue
-            absolute_url = urljoin(self.link, href)
-            links.append(absolute_url)
-
-        internal_links = []
-        external_links = []
-        for link in links:
-            parsed = urlparse(link)
-            if parsed.scheme not in ['http', 'https']:
-                continue
-            if parsed.netloc == self.link_base:
-                internal_links.append(link)
-            else:
-                external_links.append(link)
-
-        return internal_links, external_links
