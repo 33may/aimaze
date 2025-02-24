@@ -7,13 +7,6 @@ from urllib.parse import urljoin
 from time import sleep
 
 
-class ParsingError(Exception):
-    """
-    Custom exception raised when content parsing fails.
-    """
-    pass
-
-
 def bfs_site(starting_url: str, auth_info=None, slowdown_s: float = 0.05) -> dict[str, str]:
     "Returns all pages found on the given site labeled by URL."
     
@@ -27,7 +20,7 @@ def bfs_site(starting_url: str, auth_info=None, slowdown_s: float = 0.05) -> dic
         print("Processing", link)
 
         html = get_content(link, auth_info)
-        pages[link] = html_to_md(html)
+        pages[link] = md(html)
 
         # Add new links which aren't already processed.
         links |= get_all_links(html, base_url) - set(pages)
@@ -36,7 +29,7 @@ def bfs_site(starting_url: str, auth_info=None, slowdown_s: float = 0.05) -> dic
     return pages
 
 
-def get_content(url: str, auth_info=None) -> str | None:
+def get_content(url: str, auth_info=None) -> str:
     try:
         r = get(url)
 
@@ -49,11 +42,6 @@ def get_content(url: str, auth_info=None) -> str | None:
         print(f"Couldn't access page: {url}, {e}")
 
         return ""
-        # raise ParsingError
-
-
-def html_to_md(html: str) -> str:
-    return md(html)
 
 
 def get_all_links(html: str, base_url: str, internal_only=True) -> set[str]:
