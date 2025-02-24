@@ -1,6 +1,9 @@
 import requests
+from requests import get
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, urljoin
+from markdownify import markdownify as md
+from urllib.parse import urljoin
 
 
 class ParsingError(Exception):
@@ -10,7 +13,7 @@ class ParsingError(Exception):
     pass
 
 
-class PageProcessor:
+class ContentProcessor:
     """
     A class to process and extract information from web content.
 
@@ -28,32 +31,21 @@ class PageProcessor:
         self.protected = protected
         self.content = self._get_content()
 
-    def _get_content(self):
-        """
-        Fetches the HTML content from the URL specified by self.link.
 
-        Returns:
-            str: The HTML content of the page if the request is successful.
-
-        Raises:
-            ParsingError: If the content could not be parsed.
-
-        Note:
-            If the protected flag is True, additional authentication handling might be required.
-        """
+    def _get_content(url: str, auth_info=None) -> str:
         try:
-            response = requests.get(self.link)
-            response.raise_for_status()
-            return response.text
+            r = get(url)
+
+            if not r.status_code == 200:
+                raise Exception(f"Couldn't access page: {url} (HTTP {r.status_code})")  # TODO: Better way to handle this than nuke button.
+
+            return r.content
         except requests.RequestException as e:
             print(f"Error fetching content from {self.link}: {e}")
             raise ParsingError
 
-    def html_to_md(self):
-        """
-        Converts HTML content to Markdown format.
-        """
-        pass
+    def html_to_md(self, html: str) -> str:
+        return md(html)
 
     def get_all_links(self):
         """
