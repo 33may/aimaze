@@ -4,6 +4,14 @@ from markdownify import markdownify as md
 from urllib.parse import urljoin
 
 
+class ParsingError(Exception):
+    """
+    Custom exception raised when content parsing fails.
+    """
+    pass
+
+
+
 def get_content(url: str, auth_info=None) -> str:
     try:
         r = get(url)
