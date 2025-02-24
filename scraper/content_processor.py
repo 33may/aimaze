@@ -12,8 +12,10 @@ class ParsingError(Exception):
     """
     pass
 
+def html_to_md(html: str) -> str:
+    return md(html)
 
-class ContentProcessor:
+class PageProcessor:
     """
     A class to process and extract information from web content.
 
@@ -32,20 +34,18 @@ class ContentProcessor:
         self.content = self._get_content()
 
 
-    def _get_content(url: str, auth_info=None) -> str:
+    def _get_content(self) -> str:
         try:
-            r = get(url)
+            r = get(self.link)
 
             if not r.status_code == 200:
-                raise Exception(f"Couldn't access page: {url} (HTTP {r.status_code})")  # TODO: Better way to handle this than nuke button.
+                raise ParsingError(f"Couldn't access page: {self.link} (HTTP {r.status_code})")  # TODO: Better way to handle this than nuke button.
 
             return r.content
         except requests.RequestException as e:
             print(f"Error fetching content from {self.link}: {e}")
             raise ParsingError
 
-    def html_to_md(self, html: str) -> str:
-        return md(html)
 
     def get_all_links(self):
         """

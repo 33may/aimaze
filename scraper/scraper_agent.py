@@ -2,7 +2,7 @@ import random
 
 from loguru import logger
 
-from scraper.content_processor import PageProcessor, ParsingError
+from scraper.content_processor import PageProcessor, ParsingError, html_to_md
 from collections import deque
 
 
@@ -33,7 +33,7 @@ class ScraperAgent:
                 logger.debug(f"Page {cur_url} is useful")
                 self.result.append({
                     'url': cur_url,
-                    'content': content,
+                    'content': html_to_md(content),
                 })
 
             internal_links, _ = page_processor.get_all_links()
