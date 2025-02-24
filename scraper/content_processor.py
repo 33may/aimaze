@@ -66,6 +66,11 @@ class ContentProcessor:
         if html is None:
             return []
         soup = BeautifulSoup(html, 'html.parser')
-        links = [a['href'] for a in soup.find_all('a', href=True)]
 
-        return links
+        links = [a['href'] if "https://" in a["href"] else self.link_base + a["href"] for a in soup.find_all('a', href=True)]
+
+        internal_links = [link for link in links if self.link_base in link]
+
+        external_links = [link for link in links if self.link_base not in link]
+
+        return internal_links, external_links
