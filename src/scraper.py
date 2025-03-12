@@ -9,10 +9,10 @@ from time import sleep
 
 def bfs_site(starting_url: str, auth_info=None, slowdown_s: float = 0.05) -> dict[str, str]:
     "Returns all pages found on the given site labeled by URL."
-    
+
     pages = dict()
     links = {starting_url}  # Sets so duplicates get filtered automatically.
-    
+
     base_url = urljoin(starting_url, "/")
 
     while links:
@@ -34,7 +34,7 @@ def get_content(url: str, auth_info=None) -> str:
         r = get(url)
 
         if not r.status_code == 200:
-            print(f"Couldn't access page: {url} (HTTP {r.status_code})")  
+            print(f"Couldn't access page: {url} (HTTP {r.status_code})")
             return ""
 
         return r.content
@@ -44,15 +44,10 @@ def get_content(url: str, auth_info=None) -> str:
         return ""
 
 
-def get_all_links(html: str, base_url: str, internal_only=True) -> set[str]:
+def get_all_links(html: str, base_url: str) -> set[str]:
     soup = BeautifulSoup(html, 'html.parser')
 
     # '/page/1#Header-2' -> 'https://full-url.com/page/1' (and doesn't fuck up on already full URLs.)
     links = {urljoin(base_url, a.get('href')).split('#')[0] for a in soup.find_all('a')}
 
-    return {l for l in links if l.startswith(base_url)} if internal_only else links
-
-
-if __name__ == "__main__":
-    print(bfs_site("https://developer-specs.company-information.service.gov.uk/companies-house-identity-service/reference").keys())
-
+    return {l for l in links if l.startswith(base_url)}
