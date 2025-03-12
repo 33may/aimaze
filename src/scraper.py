@@ -1,5 +1,5 @@
 from requests import get, RequestException
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Comment
 from urllib.parse import urlparse, urljoin
 from markdownify import markdownify as md
 from urllib.parse import urljoin
@@ -51,3 +51,20 @@ def get_all_links(html: str, base_url: str) -> set[str]:
     links = {urljoin(base_url, a.get('href')).split('#')[0] for a in soup.find_all('a')}
 
     return {l for l in links if l.startswith(base_url)}
+
+
+def clean_html(html: str) -> str:
+    soup = BeautifulSoup(html, 'html.parser')
+
+    for tag in soup(['script', 'style', 'head', 'meta', 'link', 'noscript', 'title']):
+        tag.decompose()
+
+    for comment in soup.find_all(text=lambda text: isinstance(text, Comment)):
+        comment.extract()
+
+    if soup.body:
+        cleaned_content = soup.body.decode_contents().strip()
+    else:
+        cleaned_content = str(soup).strip()
+
+    return cleaned_content
