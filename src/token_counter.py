@@ -5,77 +5,73 @@ from markdownify import markdownify as md
 from requests import get
 import re
 from collections import defaultdict
-import os
 import json
 
+
+from scraper import bfs_site
 
 cl100k_base = tiktoken.get_encoding("cl100k_base")
 
 
-def shrink_entry(text: str) -> str:
-    """Converts html to markdown, and removes excessive whitelines/spaces."""
-    shrunk = re.sub(r"\n+", r"\n", md(text))
+WEBSITES_STATIC = [
+    ("https://docs.github.com/en/rest/rate-limit/rate-limit?apiVersion=2022-11-28", "/en/rest"),
+    ("https://developer.spotify.com/documentation/web-api/reference/check-if-user-follows-playlist", "/documentation/web-api"),
+    ("https://woocommerce.github.io/woocommerce-rest-api-docs/", "/woocommerce-rest-api-docs"),
+    ("https://developers.notion.com/reference/intro/", "/reference"),
+    ("https://developers.pipedrive.com/docs/api/v1/ActivityTypes#getActivityTypes", "/docs/api/v1"),
+    ("https://developer.calendly.com/api-docs/d37c7f031f339-list-activity-log-entries", "/api-docs"),
+    ("https://docs.stripe.com/api/", "/api"),
+    ("https://docs.webwinkelkeur.nl/", "/"),
+    ("https://www.storyblok.com/docs/api/", "/docs/api"),
+    ("https://developers.etrusted.com/reference/api-introduction", "/reference"),
+    ("https://developers.hubspot.com/docs/reference/api/overview", "/docs/reference/api"),
+    ("https://learn.microsoft.com/en-us/linkedin/", "/linkedin"),
+    ("https://learn.microsoft.com/en-us/rest/api/aks/agent-pools/abort-latest-operation?view=rest-aks-2025-01-01&tabs=HTTP", "/en-us/rest/api"),
+    # ("", ""),
+]
 
-    return re.sub(r"  +", " ", shrunk)
+WEBSITES_DYNAMIC = [
+    ("https://developer.apple.com/documentation/", "/documentation"),
+    ("https://shopify.dev/docs/api", "/docs/api"),
+    ("https://doc.magentochina.org/swagger/#/", "/swagger"),
+    ("https://demo.anewspring.com/apidocs#/", "/apidocs"),
+    # ("", ""),
+]
 
+WEBSITES_WITH_OPENAPI [
+    "https://api.bol.com/retailer/public/Retailer-API/key-concepts.html",
 
-def get_content(url: str, auth_info=None) -> str:
-    r = get(url)
+]
 
-    if not r.status_code == 200:
-        raise Exception(f"Couldn't access page: {url} (HTTP {r.status_code})")
+MEGA_APIS = [
+    "github",
+    "microsoft.com/en-us/rest/api",
+    "apple",
+    "stripe",
+    "storyblok",
+    "shopify"
+]
 
-    return str(r.content)
+data = defaultdict(dict)
 
+for (website, domain_url) in WEBSITES_DYNAMIC:
+    if not domain_url.endswith('/'):
+        domain_url += '/'
+    base_url = urljoin(website, domain_url)
 
-SPLITTER = "#-#endpoint"
+    for (url, html) in bfs_site(website, domain_url).items():
+        temp_base_url = base_url
+        n_tokens = len(cl100k_base.encode(html, disallowed_special=()))
 
-data = defaultdict(lambda: defaultdict(list))
-if os.path.isfile('results.json'):
-    with open('results.json', 'r') as f:
-        for base_url, stats in json.load(f).items():
-            data[base_url] = defaultdict(list, stats)
+        # Temp base to go one folder deeper in docs for 'sub-APIs'.
+        if any(x in base_url for x in MEGA_APIS):
+            temp_base_url = base_url + url.replace(base_url, "").split("/")[0]
 
-while True:
-    url = input("Enter URL: ")
+        data[temp_base_url][url] = n_tokens
+        print(f"{url}: {n_tokens} tokens")
 
-    with open('download.md', 'w') as f:
-        if url.startswith("https://developer.spotify.com/"):
-            f.write(shrink_entry(get_content(url)).split("Request")[1])
-        elif url.startswith("https://developers.pipedrive.com/"):
-            endpoints_only = (shrink_entry(get_content(url)
-                                           .replace("\\n#### ", f"\\n{SPLITTER}\n#### ")
-                                           .split("### Subscribe to Pipedrive’s")[0]
-                                           .split(SPLITTER)[1:]))
+# with open('results.json', "r") as f:
+    # data.update(json.load(f))
 
-            f.write(SPLITTER.join(endpoints_only))
-        else:
-            f.write(shrink_entry(get_content(url)))
-
-            if not input(f"Place '{SPLITTER}' markers ([y]es): ").lower().startswith("y"):
-                print("Quitting EDA tool")
-                exit()
-
-    while True:
-        with open('download.md', 'r') as f:
-            endpoints = f.read().split(SPLITTER)
-        ok = input(f"Found {len(endpoints)} endpoints. Is this correct? ([y]es, [r]eload): ")
-
-        if ok.startswith('y'):
-            break
-        if ok.startswith('r'):
-            continue
-        exit()
-
-
-    base_url = urljoin(url, "/")
-    for i, ep in enumerate(endpoints):
-        n_tokens = len(cl100k_base.encode(ep, disallowed_special=()))
-        from pprint import pprint
-        data[base_url][url].append(n_tokens)
-        print(f"Endpoint {i}: {n_tokens} tokens")
-
-    with open('results.json', 'w') as f:
-        json.dump(data, f, indent=4)
-
-    print(f"Processed {url}")
+with open('results.json', 'w') as f:
+    json.dump(data, f, indent=4)
