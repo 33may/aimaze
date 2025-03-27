@@ -38,7 +38,7 @@ WEBSITES_DYNAMIC = [
     # ("", ""),
 ]
 
-WEBSITES_WITH_OPENAPI [
+WEBSITES_WITH_OPENAPI = [
     "https://api.bol.com/retailer/public/Retailer-API/key-concepts.html",
 
 ]
@@ -54,14 +54,14 @@ MEGA_APIS = [
 
 data = defaultdict(dict)
 
-for (website, domain_url) in WEBSITES_DYNAMIC:
+for (website, domain_url) in WEBSITES_STATIC:
     if not domain_url.endswith('/'):
         domain_url += '/'
     base_url = urljoin(website, domain_url)
 
-    for (url, html) in bfs_site(website, domain_url).items():
+    for (url, content) in bfs_site(website, domain_url).items():
         temp_base_url = base_url
-        n_tokens = len(cl100k_base.encode(html, disallowed_special=()))
+        n_tokens = len(cl100k_base.encode(content, disallowed_special=()))
 
         # Temp base to go one folder deeper in docs for 'sub-APIs'.
         if any(x in base_url for x in MEGA_APIS):
