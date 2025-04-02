@@ -1,12 +1,12 @@
 from typing import List
 import logging
 from datetime import datetime
-from shared.FunctionClass import BaseFunction
-from shared.ParameterClass import Parameter, ParameterType
-from shared.OutputParameterClass import OutputParameter, OutputParameterType
-from shared.InputClass import StandardInput
-from shared.OutputClass import StandardOutput
-from shared.ValidationClass import ValidationSeverity, CustomValidationType
+from FunctionClass import BaseFunction
+from ParameterClass import Parameter, ParameterType
+from OutputParameterClass import OutputParameter, OutputParameterType
+from InputClass import StandardInput
+from OutputClass import StandardOutput
+from ValidationClass import ValidationSeverity, CustomValidationType
 from functions_classes.WooCommerceClass import WooCommerceClass, WooCommerceConfig, WooCommerceAuthType
 
 class CreateWooCommerceCoupon(BaseFunction):
