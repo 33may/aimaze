@@ -1,13 +1,13 @@
 from typing import List
 import logging
 from datetime import datetime
-from shared.FunctionClass import BaseFunction
-from shared.ParameterClass import Parameter, ParameterType
-from shared.OutputParameterClass import OutputParameter, OutputParameterType
-from shared.InputClass import StandardInput
-from shared.OutputClass import StandardOutput
-from shared.ValidationClass import ValidationSeverity, CustomValidationType
-from functions_classes.WooCommerceClass import WooCommerceClass, WooCommerceConfig, WooCommerceAuthType
+from FunctionClass import BaseFunction
+from ParameterClass import Parameter, ParameterType
+from OutputParameterClass import OutputParameter, OutputParameterType
+from InputClass import StandardInput
+from OutputClass import StandardOutput
+from ValidationClass import ValidationSeverity, CustomValidationType
+# from functions_classes.WooCommerceClass import WooCommerceClass, WooCommerceConfig, WooCommerceAuthType
 
 class GetWooCommerceCoupons(BaseFunction):
     def get_parameter_schema(self) -> List[Parameter]:
@@ -337,7 +337,6 @@ class GetWooCommerceCoupons(BaseFunction):
             ),
         ]
 
-
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
             # Get validated parameters
@@ -411,3 +410,9 @@ class GetWooCommerceCoupons(BaseFunction):
             error_msg = f"Error retrieving coupons: {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
+
+
+from pprint import pprint
+pprint([p.to_json() for p in GetWooCommerceCoupons().get_parameter_schema()])
+print('\n\n')
+pprint([p.to_json() for p in GetWooCommerceCoupons().get_output_schema()])

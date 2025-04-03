@@ -1,8 +1,8 @@
 import ast
 import re
 from typing import Any
-from shared.ParameterClass import Parameter, ParameterType
-from shared.ValidationClass import ValidationResult, ValidationSeverity, CustomValidationType
+from ParameterClass import Parameter, ParameterType
+from ValidationClass import ValidationResult, ValidationSeverity, CustomValidationType
 from urllib.parse import urlparse, ParseResult
 from datetime import datetime
 import json

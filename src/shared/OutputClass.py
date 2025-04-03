@@ -1,7 +1,7 @@
 from typing import Any, Dict, List
 import json
 import logging
-from .OutputParameterClass import OutputParameter, OutputParameterSchema, OutputParameterValidationError
+from OutputParameterClass import OutputParameter, OutputParameterSchema, OutputParameterValidationError
 
 class StandardOutput:
     def __init__(self, output_data: Dict[str, Any], output_schema: List[OutputParameter]):

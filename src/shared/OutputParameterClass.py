@@ -39,6 +39,12 @@ class OutputParameter:
             default_value=data.get('default_value')
         )
 
+    def to_json(self) -> dict[str, Any]:
+        return {"name": self.name,
+                "type": self.param_type.name.lower(),
+                "is_array": self.is_array,
+                "default": self.default_value}
+
 class OutputParameterValidationError(Exception):
     """Custom exception for output parameter validation errors"""
     pass

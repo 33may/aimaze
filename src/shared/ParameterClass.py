@@ -33,3 +33,8 @@ class Parameter:
         self.required = required
         self.validation_rules = validation_rules or {}
         self.custom_validator = custom_validator
+
+    def to_json(self) -> dict[str, Any]:
+        return {"name": self.name,
+                "type": self.param_type.name.lower(),
+                "required": self.required}
