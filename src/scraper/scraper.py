@@ -25,7 +25,7 @@ def _shrink_entry(text: str) -> str:
     return re.sub(r"  +", " ", shrunk)
 
 
-def bfs_site(starting_url: str, domain_url= "/", auth_info=None, slowdown_s: float = 0.1) -> dict[str, str]:
+def bfs_site(starting_url: str, filter_fn, domain_url= "/", auth_info=None, slowdown_s: float = 0.01) -> dict[str, str]:
     """
     Returns all pages found on the given site labeled by URL.
     domain_url speficies our 'root', because just '/' to determine internal links will lead to nightmares processing github.com/documentation.
@@ -42,51 +42,59 @@ def bfs_site(starting_url: str, domain_url= "/", auth_info=None, slowdown_s: flo
 
         html = get_content(link, auth_info)
 
-        pages[link] = _shrink_entry(html)
+        cleaned_html = _shrink_entry(html)
+
+        if filter_fn(cleaned_html):
+            pages[link] = cleaned_html
 
         # Add new links which aren't already processed.
         links |= _get_all_links(html, base_url) - set(pages)
 
         sleep(slowdown_s)  # So we don't accidentaly DoS the docs.
-    return pages
+
+    return {
+        "name": base_url,
+        "base_url": base_url,
+        "endpoint_pages": pages,
+    }
 
 
-# def get_content(url: str, auth_info=None) -> str:
-#     try:
-#         r = get(url)
-#
-#         if not r.status_code == 200:
-#             print(f"Couldn't access page: {url} (HTTP {r.status_code})")
-#             return ""
-#
-#         return r.content
-#     except RequestException as e:
-#         print(f"Couldn't access page: {url}, {e}")
-#
-#         return ""
-
-def get_content(url: str, auth_info=None):
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-
-    service = Service(ChromeDriverManager().install())
-    driver = Chrome(service=service, options=chrome_options)
-
+def get_content(url: str, auth_info=None) -> str:
     try:
-        driver.get(url)
+        r = get(url)
 
-        WebDriverWait(driver, 100).until(
-            EC.presence_of_element_located((By.TAG_NAME, "body"))
-        )
+        if not r.status_code == 200:
+            print(f"Couldn't access page: {url} (HTTP {r.status_code})")
+            return ""
 
-        content = driver.page_source
-    finally:
-        driver.quit()
+        return r.content
+    except RequestException as e:
+        print(f"Couldn't access page: {url}, {e}")
 
-    return content
+        return ""
+
+# def get_content(url: str, auth_info=None):
+#     chrome_options = Options()
+#     chrome_options.add_argument("--headless")
+#     chrome_options.add_argument("--disable-gpu")
+#     chrome_options.add_argument("--no-sandbox")
+#     chrome_options.add_argument("--disable-dev-shm-usage")
+#
+#     service = Service(ChromeDriverManager().install())
+#     driver = Chrome(service=service, options=chrome_options)
+#
+#     try:
+#         driver.get(url)
+#
+#         WebDriverWait(driver, 100).until(
+#             EC.presence_of_element_located((By.TAG_NAME, "body"))
+#         )
+#
+#         content = driver.page_source
+#     finally:
+#         driver.quit()
+#
+#     return content
 
 
 def _get_all_links(html: str, base_url: str) -> set[str]:

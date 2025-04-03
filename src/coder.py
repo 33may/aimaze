@@ -1,9 +1,7 @@
-from scraper import get_content
-from parser import extract_code
 from markdownify import markdownify as md
 from openai import OpenAI
 
-
+from src.scraper.scraper import get_content
 
 SCHEMA_EXTRACTION_PROMPT = """
 The markdown section below is part of an API documentation, containing endpoints with their input/output schema's. Convert every endpoint as listed in the documentation into json schema's as instructed below.
