@@ -1,7 +1,8 @@
 [
-      {
+          {
           "name": "aNewSpring",
-          "base_url": "https://support.anewspring.com/en/",
+          "base_url": "https://support.anewspring.com",
+          "domain_url": "/en/",
           "endpoint_pages" :
                 [
                     "https://support.anewspring.com/en/articles/70415-api-calls-users",
@@ -16,9 +17,10 @@
                     "https://support.anewspring.com/en/articles/70588-api-calls-profile"
                 ]
       },
-      {
+   {
           "name": "HubSpot",
-          "base_url": "https://developers.hubspot.com/docs/",
+          "base_url": "https://developers.hubspot.com",
+          "domain_url": "/docs/",
           "endpoint_pages" :
                 [
                     "https://developers.hubspot.com/docs/reference/api/analytics-and-events/email-analytics ",

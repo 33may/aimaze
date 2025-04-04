@@ -48,12 +48,13 @@ def benchmark_scraper(
     for api in apis_to_process:
         api_name = api.get("name", "Unnamed API")
         base_url = api.get("base_url")
+        domain_url = api.get("domain_url")
         expected_pages = set(api.get("endpoint_pages", []))
         total_expected += len(expected_pages)
 
         logger.info(f"Benchmarking API: {api_name} ({base_url})")
 
-        scraped_result = bfs_site(base_url, filter_fn)
+        scraped_result = bfs_site(base_url, filter_fn, domain_url)
 
         scraped_pages = set(scraped_result.get("endpoint_pages", {}).keys())
         total_scraped += len(scraped_pages)
