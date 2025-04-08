@@ -28,7 +28,7 @@ def benchmark_scraper(
     with open("benchmark_data.json", "r", encoding="utf-8") as f:
         benchmark_data = json.load(f)
 
-    # Determine which APIs to process
+    # which APIs to process
     if num_apis == "all":
         apis_to_process = benchmark_data
     else:
@@ -97,3 +97,6 @@ def benchmark_scraper(
         json.dump(benchmark_results, out_file, indent=4)
 
     logger.info("Benchmark completed. Summary written to benchmark_summary.json")
+
+
+benchmark_scraper(lambda x: True, scraped_data=None)

@@ -3,7 +3,7 @@ import psycopg2
 from src.scraper.scraper import bfs_site
 
 DB_NAME = "pages_cache"
-DB_USER = "postgres"
+DB_USER = "may"
 DB_PASSWORD = "storage"
 DB_HOST = "localhost"
 DB_PORT = "5432"
@@ -24,8 +24,7 @@ def init_db():
     cur.execute('''
         create table if not exists pages (
             url TEXT primary key,
-            html TEXT,
-        )
+            html TEXT)
     ''')
     conn.commit()
     cur.close()
@@ -62,5 +61,15 @@ def add_api_to_db(url: str, domain_url: str) -> None:
 
 
 if __name__ == "__main__":
+
+    # not done
     # add_api_to_db("https://developers.hubspot.com", "/docs/")
-    add_api_to_db("https://support.anewspring.com", "/en/")
+
+    # done
+    # add_api_to_db("https://support.anewspring.com", "/en/")
+
+    # done
+    # add_api_to_db("https://developers.pipedrive.com/", "/docs/")
+
+    # not done
+    add_api_to_db("https://developer.calendly.com/", "")

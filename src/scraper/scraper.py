@@ -37,6 +37,7 @@ def bfs_site(starting_url: str, filter_fn, domain_url= "/", auth_info=None, slow
     base_url = urljoin(starting_url, domain_url)
 
     while links:
+        print(f"Processing {len(links)} links...")
         link = links.pop()
         print("Processing", link)
 
@@ -79,6 +80,7 @@ def get_content(url: str, auth_info=None):
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
+
 
     service = Service(ChromeDriverManager().install())
     driver = Chrome(service=service, options=chrome_options)
