@@ -4,12 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9bebb276-519e-47fd-90b6-7420c6edde05" name="Changes" comment="changes to benchmark">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/scraper/data_preparation.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/src/scraper/data_preparation.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/scraper/scraper.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/scraper/scraper.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/scraper/scraper_benchmark.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/scraper/scraper_benchmark.py" afterDir="false" />
-    </list>
+    <list default="true" id="9bebb276-519e-47fd-90b6-7420c6edde05" name="Changes" comment="data preparation doc finished" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -252,7 +247,7 @@
       <workItem from="1744110611917" duration="12749000" />
       <workItem from="1744289274241" duration="4793000" />
       <workItem from="1744964388394" duration="8180000" />
-      <workItem from="1744974419945" duration="1574000" />
+      <workItem from="1744974419945" duration="2719000" />
     </task>
     <task id="LOCAL-00001" summary="start with parsing env">
       <option name="closed" value="true" />
@@ -350,7 +345,15 @@
       <option name="project" value="LOCAL" />
       <updated>1744974374935</updated>
     </task>
-    <option name="localTasksCounter" value="13" />
+    <task id="LOCAL-00013" summary="data preparation doc finished">
+      <option name="closed" value="true" />
+      <created>1744977185607</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1744977185607</updated>
+    </task>
+    <option name="localTasksCounter" value="14" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -381,7 +384,8 @@
     <MESSAGE value="scraping doesnt work ATALLLLL" />
     <MESSAGE value="start data prep" />
     <MESSAGE value="changes to benchmark" />
-    <option name="LAST_COMMIT_MESSAGE" value="changes to benchmark" />
+    <MESSAGE value="data preparation doc finished" />
+    <option name="LAST_COMMIT_MESSAGE" value="data preparation doc finished" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
