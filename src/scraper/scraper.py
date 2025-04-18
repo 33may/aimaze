@@ -9,13 +9,14 @@ from time import sleep
 
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.support.wait import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver import Chrome
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+
+from src.scraper.eval_db.db_utils import get_page_by_url
 
 
 def _shrink_entry(text: str) -> str:
@@ -25,7 +26,7 @@ def _shrink_entry(text: str) -> str:
     return re.sub(r"  +", " ", shrunk)
 
 
-def bfs_site(starting_url: str, filter_fn, domain_url= "/", auth_info=None, slowdown_s: float = 0.01) -> dict[str, str]:
+def bfs_site(starting_url: str, filter_fn, domain_url= "/", auth_info=None, slowdown_s: float = 0.01, use_db=False) -> dict[str, str]:
     """
     Returns all pages found on the given site labeled by URL.
     domain_url speficies our 'root', because just '/' to determine internal links will lead to nightmares processing github.com/documentation.
@@ -41,7 +42,7 @@ def bfs_site(starting_url: str, filter_fn, domain_url= "/", auth_info=None, slow
         link = links.pop()
         print("Processing", link)
 
-        html = get_content(link, auth_info)
+        html = get_content(link, auth_info) if not use_db else get_content_local(link)
 
         cleaned_html = _shrink_entry(html)
 
@@ -97,6 +98,9 @@ def get_content(url: str, auth_info=None):
         driver.quit()
 
     return content
+
+def get_content_local(url: str):
+    return get_page_by_url(url)
 
 
 def _get_all_links(html: str, base_url: str) -> set[str]:

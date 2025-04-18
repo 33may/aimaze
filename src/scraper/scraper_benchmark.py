@@ -3,12 +3,31 @@ from time import sleep
 from typing import Callable, Dict, Union
 from loguru import logger
 
+from src.scraper.eval_db.db_utils import store_page
 from src.scraper.scraper import bfs_site
+
+
+def add_api_to_db(url: str, domain_url: str) -> None:
+
+    with open('../benchmark_data.json', 'r') as file:
+        data = json.load(file)
+        for obj in data:
+            if obj.get("base_url") == url:
+                endpoint_pages = obj.get("endpoint_pages")
+
+
+    data = bfs_site(url, lambda content: True, domain_url)
+
+    all_scraped_pages = data.get("endpoint_pages", {})
+
+    for key, value in all_scraped_pages.items():
+        is_endpoint = key in endpoint_pages
+        store_page(key, value, is_endpoint)
 
 
 def benchmark_scraper(
         filter_fn: Callable[[str], bool],
-        scraped_data=None,
+        use_db = True,
         num_apis: Union[str, int] = "all",
 ) -> None:
     """
@@ -17,7 +36,7 @@ def benchmark_scraper(
     Parameters:
       filter_fn: A filter function labels (str) to the filter functions.
                   Each filter function should accept a page's content (str) and return a bool.
-      scraped_data: Optional pre-scraped data to evaluate (instead of running scrape_fn).
+      use_db: Flag to use db over the web scraping.
       num_apis: How many APIs to benchmark. Use "all" for every API in the dataset. If an integer,
                 it must not exceed the number of APIs in the dataset.
 
@@ -54,7 +73,7 @@ def benchmark_scraper(
 
         logger.info(f"Benchmarking API: {api_name} ({base_url})")
 
-        scraped_result = bfs_site(base_url, filter_fn, domain_url)
+        scraped_result = bfs_site(base_url, filter_fn, domain_url, use_db=use_db)
 
         scraped_pages = set(scraped_result.get("endpoint_pages", {}).keys())
         total_scraped += len(scraped_pages)
@@ -97,6 +116,3 @@ def benchmark_scraper(
         json.dump(benchmark_results, out_file, indent=4)
 
     logger.info("Benchmark completed. Summary written to benchmark_summary.json")
-
-
-benchmark_scraper(lambda x: True, scraped_data=None)

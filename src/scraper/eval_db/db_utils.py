@@ -1,7 +1,5 @@
 import psycopg2
 
-from src.scraper.scraper import bfs_site
-
 DB_NAME = "pages_cache"
 DB_USER = "may"
 DB_PASSWORD = "storage"
@@ -24,7 +22,8 @@ def init_db():
     cur.execute('''
         create table if not exists pages (
             url TEXT primary key,
-            html TEXT)
+            html TEXT,
+            is_endpoint BOOLEAN)
     ''')
     conn.commit()
     cur.close()
@@ -39,37 +38,32 @@ def get_page_by_url(url:str) -> str:
     conn.close()
     return row[0] if row else None
 
-def store_page(url: str, html: str) -> None:
+def get_api_pages_by_url(url: str) -> list:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT html FROM pages WHERE url LIKE %s and is_endpoint = True", (f"%{url}%",))
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return rows
+
+def is_site_in_db(url: str) -> bool:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT 1 FROM pages WHERE url LIKE %s LIMIT 1", (f"%{url}%",))
+    exists = cur.fetchone() is not None
+    cur.close()
+    conn.close()
+    return exists
+
+def store_page(url: str, html: str, is_endpoint: bool) -> None:
     conn = get_connection()
     cur = conn.cursor()
     cur.execute('''
-        INSERT INTO pages (url, html)
-        VALUES (%s, %s)
+        INSERT INTO pages (url, html, is_endpoint)
+        VALUES (%s, %s, %s)
         on conflict do nothing
-    ''', (url, html))
+    ''', (url, html, is_endpoint))
     conn.commit()
     cur.close()
     conn.close()
-
-def add_api_to_db(url: str, domain_url: str) -> None:
-    data = bfs_site(url, lambda content: True, domain_url)
-
-    scraped_pages = data.get("endpoint_pages", {})
-
-    for key, value in scraped_pages.items():
-        store_page(key, value)
-
-
-if __name__ == "__main__":
-
-    # not done
-    # add_api_to_db("https://developers.hubspot.com", "/docs/")
-
-    # done
-    # add_api_to_db("https://support.anewspring.com", "/en/")
-
-    # done
-    # add_api_to_db("https://developers.pipedrive.com/", "/docs/")
-
-    # not done
-    add_api_to_db("https://developer.calendly.com/", "")
