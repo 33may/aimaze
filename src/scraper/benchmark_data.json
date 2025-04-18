@@ -172,4 +172,55 @@
                     "https://developer.calendly.com/api-docs/2c849f3e9722a-introspect-access-refresh-token"
                 ]
       }
+    ,
+    {
+          "name": "Pipe",
+          "base_url": "Https://developers.pipedrive.com",
+          "domain_url": "/docs/api/v1",
+          "endpoint_pages" :
+                [
+                    "Https://developers.pipedrive.com/docs/api/v1/Activities",
+                    "https://developers.pipedrive.com/docs/api/v1/ActivityFields",
+                    "https://developers.pipedrive.com/docs/api/v1/ActivityTypes",
+                    "https://developers.pipedrive.com/docs/api/v1/Billing",
+                    "https://developers.pipedrive.com/docs/api/v1/CallLogs",
+                    "https://developers.pipedrive.com/docs/api/v1/Channels",
+                    "https://developers.pipedrive.com/docs/api/v1/Currencies",
+                    "https://developers.pipedrive.com/docs/api/v1/Deals",
+                    "https://developers.pipedrive.com/docs/api/v1/DealFields",
+                    "https://developers.pipedrive.com/docs/api/v1/Files",
+                    "https://developers.pipedrive.com/docs/api/v1/Filters",
+                    "https://developers.pipedrive.com/docs/api/v1/Goals",
+                    "https://developers.pipedrive.com/docs/api/v1/ItemSearch",
+                    "https://developers.pipedrive.com/docs/api/v1/Leads",
+                    "https://developers.pipedrive.com/docs/api/v1/LeadLabels",
+                    "https://developers.pipedrive.com/docs/api/v1/LeadSources",
+                    "https://developers.pipedrive.com/docs/api/v1/LegacyTeams",
+                    "https://developers.pipedrive.com/docs/api/v1/Mailbox",
+                    "https://developers.pipedrive.com/docs/api/v1/Meetings",
+                    "https://developers.pipedrive.com/docs/api/v1/Notes",
+                    "https://developers.pipedrive.com/docs/api/v1/NoteFields",
+                    "https://developers.pipedrive.com/docs/api/v1/Oauth",
+                    "https://developers.pipedrive.com/docs/api/v1/Organizations",
+                    "https://developers.pipedrive.com/docs/api/v1/OrganizationFields",
+                    "https://developers.pipedrive.com/docs/api/v1/OrganizationRelationships",
+                    "https://developers.pipedrive.com/docs/api/v1/PermissionSets",
+                    "https://developers.pipedrive.com/docs/api/v1/Persons",
+                    "https://developers.pipedrive.com/docs/api/v1/PersonFields",
+                    "https://developers.pipedrive.com/docs/api/v1/Pipelines",
+                    "https://developers.pipedrive.com/docs/api/v1/Products",
+                    "https://developers.pipedrive.com/docs/api/v1/ProductFields",
+                    "https://developers.pipedrive.com/docs/api/v1/Projects",
+                    "https://developers.pipedrive.com/docs/api/v1/ProjectTemplates",
+                    "https://developers.pipedrive.com/docs/api/v1/Recents",
+                    "https://developers.pipedrive.com/docs/api/v1/Roles",
+                    "https://developers.pipedrive.com/docs/api/v1/Stages",
+                    "https://developers.pipedrive.com/docs/api/v1/Subscriptions",
+                    "https://developers.pipedrive.com/docs/api/v1/Tasks",
+                    "https://developers.pipedrive.com/docs/api/v1/Users",
+                    "https://developers.pipedrive.com/docs/api/v1/UserConnections",
+                    "https://developers.pipedrive.com/docs/api/v1/UserSettings",
+                    "https://developers.pipedrive.com/docs/api/v1/Webhooks"
+                ]
+     }
 ]
