@@ -9,4 +9,4 @@ from src.scraper.scraper_benchmark import benchmark_scraper
 # print(a.keys())
 
 
-benchmark_scraper(lambda content: True, num_apis=1)
+benchmark_scraper(lambda content: True)
