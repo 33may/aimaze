@@ -28,6 +28,7 @@ def add_api_to_db(url: str, domain_url: str) -> None:
 def benchmark_scraper(
         filter_fn: Callable[[str], bool],
         use_db = True,
+        log=True,
         num_apis: Union[str, int] = "all",
 ) -> None:
     """
@@ -73,7 +74,7 @@ def benchmark_scraper(
 
         logger.info(f"Benchmarking API: {api_name} ({base_url})")
 
-        scraped_result = bfs_site(base_url, filter_fn, domain_url, use_db=use_db)
+        scraped_result = bfs_site(base_url, filter_fn, domain_url, use_db=use_db, log=log)
 
         scraped_pages = set(scraped_result.get("endpoint_pages", {}).keys())
         total_scraped += len(scraped_pages)

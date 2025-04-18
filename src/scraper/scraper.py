@@ -26,7 +26,7 @@ def _shrink_entry(text: str) -> str:
     return re.sub(r"  +", " ", shrunk)
 
 
-def bfs_site(starting_url: str, filter_fn, domain_url= "/", auth_info=None, slowdown_s: float = 0.01, use_db=False) -> dict[str, str]:
+def bfs_site(starting_url: str, filter_fn, domain_url= "/", auth_info=None, slowdown_s: float = 0.01, use_db=False, log=True) -> dict[str, str]:
     """
     Returns all pages found on the given site labeled by URL.
     domain_url speficies our 'root', because just '/' to determine internal links will lead to nightmares processing github.com/documentation.
@@ -38,9 +38,10 @@ def bfs_site(starting_url: str, filter_fn, domain_url= "/", auth_info=None, slow
     base_url = urljoin(starting_url, domain_url)
 
     while links:
-        print(f"Processing {len(links)} links...")
         link = links.pop()
-        print("Processing", link)
+        if log:
+            print(f"Processing {len(links)} links...")
+            print("Processing", link)
 
         html = get_content(link, auth_info) if not use_db else get_content_local(link)
 
