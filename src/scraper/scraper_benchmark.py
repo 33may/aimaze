@@ -35,7 +35,7 @@ def benchmark_scraper(
     Benchmarks the scraping function across multiple APIs from the benchmark dataset.
 
     Parameters:
-      filter_fn: A filter function labels (str) to the filter functions.
+      filter_fn: A filter function maps the page content (str) to the answer "is this page endpoint" .
                   Each filter function should accept a page's content (str) and return a bool.
       use_db: Flag to use db over the web scraping.
       num_apis: How many APIs to benchmark. Use "all" for every API in the dataset. If an integer,
