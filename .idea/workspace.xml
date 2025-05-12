@@ -4,9 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9bebb276-519e-47fd-90b6-7420c6edde05" name="Changes" comment="data prep fixed">
-      <change beforePath="$PROJECT_DIR$/src/scraper/benchmark_data.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/scraper/benchmark_data.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/scraper/eval_db/test.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/scraper/eval_db/test.py" afterDir="false" />
+    <list default="true" id="9bebb276-519e-47fd-90b6-7420c6edde05" name="Changes" comment="update + merge">
+      <change afterPath="$PROJECT_DIR$/src/scraper/chinker.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -16,9 +16,9 @@
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
-        <option value="Python Script" />
         <option value="Jupyter Notebook" />
         <option value="HTML File" />
+        <option value="Python Script" />
       </list>
     </option>
   </component>
@@ -253,7 +253,7 @@
       <workItem from="1744964388394" duration="8180000" />
       <workItem from="1744974419945" duration="7545000" />
       <workItem from="1745330216457" duration="13000" />
-      <workItem from="1747037205250" duration="421000" />
+      <workItem from="1747037205250" duration="4371000" />
     </task>
     <task id="LOCAL-00001" summary="start with parsing env">
       <option name="closed" value="true" />
@@ -383,7 +383,15 @@
       <option name="project" value="LOCAL" />
       <updated>1744996101404</updated>
     </task>
-    <option name="localTasksCounter" value="17" />
+    <task id="LOCAL-00017" summary="update + merge">
+      <option name="closed" value="true" />
+      <created>1747038008624</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1747038008624</updated>
+    </task>
+    <option name="localTasksCounter" value="18" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -418,7 +426,8 @@
     <MESSAGE value="data preparation doc finished 2" />
     <MESSAGE value="data prep fixed" />
     <MESSAGE value="changes to the scraper fns" />
-    <option name="LAST_COMMIT_MESSAGE" value="changes to the scraper fns" />
+    <MESSAGE value="update + merge" />
+    <option name="LAST_COMMIT_MESSAGE" value="update + merge" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
