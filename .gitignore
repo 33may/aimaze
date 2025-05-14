@@ -2,6 +2,9 @@
 
 .venv
 
+.idea/
+
+
 src/__pycache__
 /.idea/aimaze.iml
 /.idea/misc.xml

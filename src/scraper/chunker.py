@@ -125,8 +125,8 @@ def split_api_page(
     general:   List[Dict] = []
 
     pos = 0
-    carry = ""          # хвост предыдущего чанка
-    pending: List[Dict] = []  # секции, чей last_line ещё не найден
+    carry = ""          # tail of the prev chunk
+    pending: List[Dict] = []  # sections, with no "last_line"
 
     while pos < len(md_text):
         # 1. берём сырой кусок текста ≲ max_words слов
@@ -134,7 +134,7 @@ def split_api_page(
         prev_carry_len = len(carry)
         chunk = carry + raw_chunk
 
-        # 2. дополняем «висящие» секции и спрашиваем LLM
+        # 2. concatenating the tail of prev chunk and calling model
         items = pending + _openai_call(chunk)["endpoints"]
         pending = []
 
@@ -143,7 +143,7 @@ def split_api_page(
             carry = ""
             continue
 
-        # 3. один проход: ищем last_line каждой секции
+        # 3. looking the "last_line of every section"
         segment_start = 0
         search_from   = 0
         segment_items: List[Dict] = []
@@ -151,7 +151,7 @@ def split_api_page(
         for idx, it in enumerate(items):
             loc = chunk.find(it["last_line"], search_from)
             if loc == -1:
-                # секция неполная → оставляем на следующий раунд
+                # cant find the last line identified by model -> merge with next section from chunk
                 pending = items[idx:]
                 carry   = chunk[segment_start:]
                 break
@@ -159,30 +159,29 @@ def split_api_page(
             segment_items.append(it)
             end_idx = loc + len(it["last_line"])
 
-            # определяем категорию объединённого блока
+            # define type of block (single or merged)
             types = [s["type"] for s in segment_items]
             if "endpoint" in types:
                 target = endpoints
             elif "general" in types:
                 target = general
             else:
-                target = None  # другие типы игнорируем
+                target = None
 
             if target is not None:
                 content = chunk[segment_start:end_idx]
                 target.append({"title": segment_items[0]["title"], "content": content})
 
-            # готовимся к следующему блоку
             segment_items = []
             segment_start = end_idx
             search_from   = end_idx
 
-        # segment_items может остаться непустым, если last_line не найден в конце
+        # segment_items might be empty, if last_line not found
         if segment_items and not pending:
             pending = segment_items
             carry   = chunk[segment_start:]
 
-        # 4. обновляем глобальный курсор
+        # 4. update global pointer
         unconsumed_from_raw = max(0, len(carry) - prev_carry_len)
         pos += len(raw_chunk) - unconsumed_from_raw
 
@@ -190,9 +189,10 @@ def split_api_page(
 
 
 
+# ===== TEST ===============================
+
 with open(file="./source_html/test.md") as f:
     md_content = f.read()
-
 
 split_api_page(md_content)
 
