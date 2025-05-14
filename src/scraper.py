@@ -1,106 +1,65 @@
 from requests import get, RequestException
 from bs4 import BeautifulSoup
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urljoin
 from markdownify import markdownify as md
 from urllib.parse import urljoin
-import re
 
 from time import sleep
 
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.support.wait import WebDriverWait
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver import Chrome
 
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+failed = 0
 
 
-def _shrink_entry(text: str) -> str:
-    """Converts html email to markdown, and removes excessive whitelines/spaces."""
-    shrunk = re.sub(r"\n\n+", "\n", md(text))
+def bfs_site(starting_url: str, domain_url="/", auth_info=None, slowdown_s: float = 0.05) -> dict[str, str]:
+    "Returns all pages found on the given site labeled by URL."
 
-    return re.sub(r"  +", " ", shrunk)
-
-
-def bfs_site(starting_url: str, domain_url= "/", auth_info=None, slowdown_s: float = 0.1) -> dict[str, str]:
-    """
-    Returns all pages found on the given site labeled by URL.
-    domain_url speficies our 'root', because just '/' to determine internal links will lead to nightmares processing github.com/documentation.
-    """
-
-    pages = dict()
+    pages = {}
     links = {starting_url}  # Sets so duplicates get filtered automatically.
 
     base_url = urljoin(starting_url, domain_url)
 
     while links:
         link = links.pop()
-        print("Processing", link)
+        # print("Processing", link)
 
+        print(f"{len(pages)} pages processed, {len(links)} in queue ({failed} failed).", end="\r")
         html = get_content(link, auth_info)
-
-        pages[link] = _shrink_entry(html)
+        pages[link] = md(html)
 
         # Add new links which aren't already processed.
-        links |= _get_all_links(html, base_url) - set(pages)
+        links |= get_all_links(html, base_url) - set(pages)
 
         sleep(slowdown_s)  # So we don't accidentaly DoS the docs.
+    
+    print(f"Finished scraping ({len(pages)} successful, {failed} failed).")
+
     return pages
 
 
-# def get_content(url: str, auth_info=None) -> str:
-#     try:
-#         r = get(url)
-#
-#         if not r.status_code == 200:
-#             print(f"Couldn't access page: {url} (HTTP {r.status_code})")
-#             return ""
-#
-#         return r.content
-#     except RequestException as e:
-#         print(f"Couldn't access page: {url}, {e}")
-#
-#         return ""
-
-def get_content(url: str, auth_info=None):
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-
-    service = Service(ChromeDriverManager().install())
-    driver = Chrome(service=service, options=chrome_options)
+def get_content(url: str, auth_info=None) -> str:
+    global failed
 
     try:
-        driver.get(url)
+        r = get(url)
 
-        WebDriverWait(driver, 100).until(
-            EC.presence_of_element_located((By.TAG_NAME, "body"))
-        )
+        if not r.status_code == 200:
+            # print(f"Couldn't access page: {url} (HTTP {r.status_code})")
+            failed += 1
 
-        content = driver.page_source
-    finally:
-        driver.quit()
+            return ""
 
-    return content
+        return r.content
+    except RequestException as e:
+        # print(f"Couldn't access page: {url}, {e}")
+        failed += 1
+
+        return ""
 
 
-def _get_all_links(html: str, base_url: str) -> set[str]:
+def get_all_links(html: str, base_url: str) -> set[str]:
     soup = BeautifulSoup(html, 'html.parser')
 
     # '/page/1#Header-2' -> 'https://full-url.com/page/1' (and doesn't fuck up on already full URLs.)
     links = {urljoin(base_url, a.get('href')).split('#')[0] for a in soup.find_all('a')}
 
     return {l for l in links if l.startswith(base_url)}
-
-if __name__ == "__main__":
-    a = get_content("https://developers.asana.com/reference/getusers")
-
-    with open("asana.html", "w", encoding="utf-8") as f:
-        f.write(a)
-
-    print(a)
