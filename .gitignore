@@ -7,3 +7,4 @@ src/__pycache__
 /.idea/misc.xml
 /.idea/inspectionProfiles/profiles_settings.xml
 /.idea/inspectionProfiles/Project_Default.xml
+/venv/
