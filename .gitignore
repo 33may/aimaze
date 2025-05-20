@@ -2,8 +2,12 @@
 
 .venv
 
+.idea/
+
+
 src/__pycache__
 /.idea/aimaze.iml
 /.idea/misc.xml
 /.idea/inspectionProfiles/profiles_settings.xml
 /.idea/inspectionProfiles/Project_Default.xml
+/venv/
