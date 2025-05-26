@@ -7,12 +7,12 @@ from black import format_str, FileMode
 
 
 IMPORTS = """
-from shared.FunctionClass import BaseFunction
-from shared.ParameterClass import Parameter, ParameterType
-from shared.OutputParameterClass import OutputParameter, OutputParameterType
-from shared.InputClass import StandardInput
-from shared.OutputClass import StandardOutput
-from shared.BaseClass import APIWrapper, AuthType
+from {types_loc}.FunctionClass import BaseFunction
+from {types_loc}.ParameterClass import Parameter, ParameterType
+from {types_loc}.OutputParameterClass import OutputParameter, OutputParameterType
+from {types_loc}.InputClass import StandardInput
+from {types_loc}.OutputClass import StandardOutput
+from {types_loc}.BaseClass import APIWrapper, AuthType
 from dataclasses import dataclass
         
 
@@ -108,7 +108,7 @@ def _encode_parameters(params: list, output: bool) -> list[Parameter] | list[Out
 def wrap_api(schema: dict, base_url: str, api_name: str) -> str:
     validate(instance=schema, schema=SCHEMA)
 
-    code = IMPORTS.format(base_url=base_url, api_name=api_name)
+    code = IMPORTS.format(base_url=base_url, api_name=api_name, types_loc="shared")
 
     code += "".join([ENDPOINT_CODE.format(class_name=endpoint["name"].replace(" ", "_"),
                                           name=endpoint["name"],
