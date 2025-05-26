@@ -1,13 +1,15 @@
 .env
 
 .venv
+# uv.lock
+flake.lock
 
+.env
 .idea/
 
 
-src/__pycache__
-/.idea/aimaze.iml
-/.idea/misc.xml
-/.idea/inspectionProfiles/profiles_settings.xml
-/.idea/inspectionProfiles/Project_Default.xml
 /venv/
+.direnv/
+
+**/__pycache__/
+**/.idea/
