@@ -1,0 +1,131 @@
+Index: scraper/content_processor.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>from requests import get, RequestException\nfrom bs4 import BeautifulSoup\nfrom urllib.parse import urlparse, urljoin\nfrom markdownify import markdownify as md\nfrom urllib.parse import urljoin\n\nfrom time import sleep\n\n\ndef bfs_site(starting_url: str, auth_info=None, slowdown_s: float = 0.05) -> dict[str, str]:\n    \"Returns all pages found on the given site labeled by URL.\"\n    \n    pages = dict()\n    links = {starting_url}  # Sets so duplicates get filtered automatically.\n    \n    base_url = urljoin(starting_url, \"/\")\n\n    while links:\n        link = links.pop()\n        print(\"Processing\", link)\n\n        html = get_content(link, auth_info)\n        pages[link] = md(html)\n\n        # Add new links which aren't already processed.\n        links |= get_all_links(html, base_url) - set(pages)\n\n        sleep(slowdown_s)  # So we don't accidentaly DoS the docs.\n    return pages\n\n\ndef get_content(url: str, auth_info=None) -> str:\n    try:\n        r = get(url)\n\n        if not r.status_code == 200:\n            print(f\"Couldn't access page: {url} (HTTP {r.status_code})\")  \n            return \"\"\n\n        return r.content\n    except RequestException as e:\n        print(f\"Couldn't access page: {url}, {e}\")\n\n        return \"\"\n\n\ndef get_all_links(html: str, base_url: str, internal_only=True) -> set[str]:\n    soup = BeautifulSoup(html, 'html.parser')\n\n    # '/page/1#Header-2' -> 'https://full-url.com/page/1' (and doesn't fuck up on already full URLs.)\n    links = {urljoin(base_url, a.get('href')).split('#')[0] for a in soup.find_all('a')}\n\n    return {l for l in links if l.startswith(base_url)} if internal_only else links\n\n\nif __name__ == \"__main__\":\n    print(bfs_site(\"https://developer-specs.company-information.service.gov.uk/companies-house-identity-service/reference\").keys())\n\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/scraper/content_processor.py b/scraper/content_processor.py
+--- a/scraper/content_processor.py	(revision 54a306e26550a5f1207bf8f4686b29aa5b0bf439)
++++ b/scraper/content_processor.py	(date 1740656693956)
+@@ -6,6 +6,8 @@
+ 
+ from time import sleep
+ 
++from scraper.scraper_agent import is_page_useful
++
+ 
+ def bfs_site(starting_url: str, auth_info=None, slowdown_s: float = 0.05) -> dict[str, str]:
+     "Returns all pages found on the given site labeled by URL."
+@@ -20,7 +22,10 @@
+         print("Processing", link)
+ 
+         html = get_content(link, auth_info)
+-        pages[link] = md(html)
++        markdown_content = md(html)
++
++        if is_page_useful(markdown_content):
++            pages[link] = markdown_content
+ 
+         # Add new links which aren't already processed.
+         links |= get_all_links(html, base_url) - set(pages)
+Index: scraper/scraper_agent.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import random\n\nfrom loguru import logger\n\nfrom scraper.content_processor import PageProcessor, ParsingError, html_to_md\nfrom collections import deque\n\n\nclass ScraperAgent:\n    def __init__(self, url):\n        self.url = url\n\n        self.queue = deque()\n        self.queue.append(url)\n\n        self.visited = [url]\n\n        self.result = []\n\n    def scrape(self):\n        while self.queue:\n            cur_url = self.queue.popleft()\n\n            try:\n                page_processor = PageProcessor(cur_url)\n            except ParsingError:\n                logger.error(f\"Parsing Error foor page {cur_url}\")\n                continue\n\n            content = page_processor.content\n\n            if self._is_page_useful(content):\n                logger.debug(f\"Page {cur_url} is useful\")\n                self.result.append({\n                    'url': cur_url,\n                    'content': html_to_md(content),\n                })\n\n            internal_links, _ = page_processor.get_all_links()\n\n            for link in internal_links:\n                if self._is_link_useful(content, link) and link not in self.visited:\n                    logger.debug(f\"Link {link} is useful\")\n                    self.queue.append(link)\n                    self.visited.append(link)\n                # else:\n                #     logger.debug(f\"Link {link} skip\")\n\n        logger.debug([f\"link: {item[\"url\"]} content: {item[\"content\"][:100]}\\n\" for item in self.result])\n        return self.result\n\n\n    def _is_page_useful(self, content: str) -> bool:\n        return random.random() > 0.33\n\n    def _is_link_useful(self, content: str, next_url: str) -> bool:\n        return random.random() > 0.33
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/scraper/scraper_agent.py b/scraper/scraper_agent.py
+--- a/scraper/scraper_agent.py	(revision 54a306e26550a5f1207bf8f4686b29aa5b0bf439)
++++ b/scraper/scraper_agent.py	(date 1740656693986)
+@@ -2,56 +2,8 @@
+ 
+ from loguru import logger
+ 
+-from scraper.content_processor import PageProcessor, ParsingError, html_to_md
+-from collections import deque
+-
+-
+-class ScraperAgent:
+-    def __init__(self, url):
+-        self.url = url
+-
+-        self.queue = deque()
+-        self.queue.append(url)
+-
+-        self.visited = [url]
+-
+-        self.result = []
+-
+-    def scrape(self):
+-        while self.queue:
+-            cur_url = self.queue.popleft()
+-
+-            try:
+-                page_processor = PageProcessor(cur_url)
+-            except ParsingError:
+-                logger.error(f"Parsing Error foor page {cur_url}")
+-                continue
+-
+-            content = page_processor.content
+-
+-            if self._is_page_useful(content):
+-                logger.debug(f"Page {cur_url} is useful")
+-                self.result.append({
+-                    'url': cur_url,
+-                    'content': html_to_md(content),
+-                })
+-
+-            internal_links, _ = page_processor.get_all_links()
+-
+-            for link in internal_links:
+-                if self._is_link_useful(content, link) and link not in self.visited:
+-                    logger.debug(f"Link {link} is useful")
+-                    self.queue.append(link)
+-                    self.visited.append(link)
+-                # else:
+-                #     logger.debug(f"Link {link} skip")
+-
+-        logger.debug([f"link: {item["url"]} content: {item["content"][:100]}\n" for item in self.result])
+-        return self.result
+-
+-
+-    def _is_page_useful(self, content: str) -> bool:
+-        return random.random() > 0.33
++def is_page_useful(content: str) -> bool:
++    return random.random() > 0.33
+ 
+-    def _is_link_useful(self, content: str, next_url: str) -> bool:
+-        return random.random() > 0.33
+\ No newline at end of file
++def is_link_useful(content: str, next_url: str) -> bool:
++    return random.random() > 0.33
+\ No newline at end of file
+Index: test.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>from scraper.content_processor import ParsingError\nfrom scraper.scraper_agent import ScraperAgent\n\n# url = \"https://openrouter.ai/docs/quickstart\"\n# url = \"https://developers.kvk.nl/documentation\"\nurl = \"https://woocommerce.github.io/woocommerce-rest-api-docs/#introduction\"\n\ntry:\n    agent = ScraperAgent(url)\n\n    agent = agent.scrape()\n\n    print(33)\n\nexcept ParsingError as pe:\n    print(\"An error occurred while parsing the content:\", pe)\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/test.py b/test.py
+--- a/test.py	(revision 54a306e26550a5f1207bf8f4686b29aa5b0bf439)
++++ b/test.py	(date 1740656693978)
+@@ -1,16 +1,0 @@
+-from scraper.content_processor import ParsingError
+-from scraper.scraper_agent import ScraperAgent
+-
+-# url = "https://openrouter.ai/docs/quickstart"
+-# url = "https://developers.kvk.nl/documentation"
+-url = "https://woocommerce.github.io/woocommerce-rest-api-docs/#introduction"
+-
+-try:
+-    agent = ScraperAgent(url)
+-
+-    agent = agent.scrape()
+-
+-    print(33)
+-
+-except ParsingError as pe:
+-    print("An error occurred while parsing the content:", pe)

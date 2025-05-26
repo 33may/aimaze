@@ -10,3 +10,14 @@ soupsieve==2.6
 typing_extensions==4.12.2
 urllib3==2.3.0
 urlparse3==1.1
+loguru
+
+dotenv~=0.9.9
+python-dotenv~=1.0.1
+openai~=1.66.3
+rich~=13.9.4
+anthropic~=0.49.0
+PyYAML~=6.0.2
+tiktoken~=0.9.0
+selenium~=4.30.0
+webdriver-manager~=4.0.2
