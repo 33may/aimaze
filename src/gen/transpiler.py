@@ -1,8 +1,7 @@
-from shared.ParameterClass import Parameter, ParameterType
-from shared.OutputParameterClass import OutputParameter, OutputParameterType
+from gen.types import Parameter, ParameterType, OutputParameter, OutputParameterType
 
 from jsonschema import validate
-from shared.schema import SCHEMA
+from schemas import SCHEMA
 from black import format_str, FileMode
 
 

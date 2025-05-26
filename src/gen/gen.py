@@ -1,9 +1,12 @@
 from openai import OpenAI
 
 import json
-from transpiler import wrap_api
+from gen.transpiler import wrap_api
 
-from shared.schema import OPENAI_SCHEMA
+from schemas import OPENAI_SCHEMA
+import tiktoken
+MODEL = "gpt-4o"
+ENCODER = tiktoken.encoding_for_model(MODEL)
 
  
 # Explain general_info in schema for auth more in prompt.
@@ -16,29 +19,59 @@ Here is the page you need to parse:
 ```
 """
 
+CONTEXT_SIZE = 30_000 - len(ENCODER.encode(SCHEMA_EXTRACTION_PROMPT))
 
-client = OpenAI(api_key="")
+import os
+from dotenv import load_dotenv
 
-with open("src/test/all_types.py", "r") as f:
-    types = f.read()
+load_dotenv()
+
+client = OpenAI(api_key=os.getenv("API_KEY"))
 
 def extract_schemas(pages: dict[str, str]) -> dict:
-    # Chunk here. Simple chop on len (count tokens and split when entry goes over ctx window)
+    schemas = {"endpoints": []}
+    total = len(pages)
+    processed = 0
 
-    print("{processed}/{total} endpoints converted to code.")
+    while pages:
+        chunk = {}
+        key = None
+        space_left = CONTEXT_SIZE
 
-    chat_completion = client.chat.completions.create(
-        messages=[
-            {
-                "role": "user",
-                "content": SCHEMA_EXTRACTION_PROMPT.format(docs=str(pages))
-            }
-        ],
-        model="gpt-4o",
-        response_format=OPENAI_SCHEMA
-    )
+        while pages:  # This second chunker grabs as many chunks (as prepped before as it can fit into 1 call/ctx window)
+            key = list(pages)[0]
+            page = pages[key]
+            page_size = len(ENCODER.encode(page))
 
-    return json.loads(chat_completion.choices[0].message.content)
+            if page_size > space_left:
+                # assert chunk, f"Singular page too big for entire context: {key}"
+                if not chunk:
+                    pages.pop(key)
+                    continue
+                break
+
+            chunk[key] = pages.pop(key)
+            space_left -= page_size
+
+        
+        print(f"{processed}/{total} endpoints converted to code. Chunked {len(chunk)} pages.", end="\r")
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "user",
+                    "content": SCHEMA_EXTRACTION_PROMPT.format(docs=str(chunk))
+                }
+            ],
+            model=MODEL,
+            response_format=OPENAI_SCHEMA
+        )
+
+        schema = json.loads(chat_completion.choices[0].message.content)
+        schemas["endpoints"].extend(schema["endpoints"])
+        processed += len(chunk)
+        print(f"{processed}/{total} endpoints converted to code.", end="\r")
+
+    return schemas
 
 def generate_code(schema: dict, base_url: str, api_name: str, output_file_loc: str):
     with open(output_file_loc, "w") as f:

@@ -3,14 +3,16 @@ from urllib.parse import urljoin
 
 from validators import url as validate_url
 
-from schema_extractor import extract_schemas, generate_code
-from scraper import bfs_site
+from gen.gen import extract_schemas, generate_code
+from scrape import bfs_site
 
 
-api_name = ""
-base_url = ""
-output_file_loc = ""
-documentation_domains = []
+api_name = "Github Actions"
+base_url = "https://api.github.com/"
+output_file_loc = "test/gh.py"
+documentation_domains = [
+    ("https://docs.github.com/en/rest/actions/artifacts?apiVersion=2022-11-28", "https://docs.github.com/en/rest/actions"),
+]
 
 def main():
     os.system("clear")

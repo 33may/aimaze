@@ -17,12 +17,13 @@ def bfs_site(starting_url: str, domain_url="/", auth_info=None, slowdown_s: floa
     links = {starting_url}  # Sets so duplicates get filtered automatically.
 
     base_url = urljoin(starting_url, domain_url)
+    segment = domain_url.replace(urljoin(domain_url, "/"), "")
 
     while links:
         link = links.pop()
         # print("Processing", link)
 
-        print(f"{len(pages)} pages processed, {len(links)} in queue ({failed} failed).", end="\r")
+        print(f"{segment}: {len(pages)} pages processed, {len(links)} in queue ({failed} failed).", end="\r")
         html = get_content(link, auth_info)
         pages[link] = md(html)
 
@@ -31,7 +32,7 @@ def bfs_site(starting_url: str, domain_url="/", auth_info=None, slowdown_s: floa
 
         sleep(slowdown_s)  # So we don't accidentaly DoS the docs.
     
-    print(f"Finished scraping ({len(pages)} successful, {failed} failed).")
+    print(f"Finished scraping {segment} ({len(pages)} successful, {failed} failed).")
 
     return pages
 
