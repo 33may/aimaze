@@ -1,6 +1,7 @@
 .venv
 # uv.lock
 flake.lock
+.env
 
 .direnv/
 
