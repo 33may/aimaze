@@ -1,3 +1,4 @@
+from urllib.parse import urljoin
 from openai import OpenAI
 from math import ceil
 
@@ -5,10 +6,12 @@ import json
 from gen.transpiler import wrap_api
 from gen.chunker import chunk_page
 
+from copy import deepcopy
+
 from schemas import OPENAI_SCHEMA
 import tiktoken
-MODEL = "gpt-4o"
-ENCODER = tiktoken.encoding_for_model(MODEL)
+MODEL = "gpt-4.1-nano"
+ENCODER = tiktoken.encoding_for_model("gpt-4o")
 
  
 # Explain general_info in schema for auth more in prompt.
@@ -34,10 +37,24 @@ client = OpenAI(api_key=os.getenv("API_KEY"))
 CLEARLINE = "                      "
 
 def extract_schemas(pages: dict[str, str]) -> dict:
+    print("Checking pages for need of chunking...")
+    for url, page in deepcopy(pages).items():  # Individual page chunker.
+        page_size = len(ENCODER.encode(page))
+        if page_size > CONTEXT_SIZE:
+            print(f"Chunking '{url.replace(urljoin(url, "/"), "")}' into ~{ceil(page_size / CONTEXT_SIZE)} chunks.", end="\r")
+            pages.pop(url)
+            pages.update({f"{url}-#{i}": chunk for i, chunk in 
+                enumerate(chunk_page(client, 
+                                     MODEL,
+                                     page,
+                                     CONTEXT_SIZE - 1000))
+            })
+
     schemas = {"endpoints": []}
     total = len(pages)
     processed = 0
 
+    print("Page chunking done, extracting schemas.")
     while pages:
         chunk = {}
         key = None
@@ -49,24 +66,12 @@ def extract_schemas(pages: dict[str, str]) -> dict:
             page_size = len(ENCODER.encode(page))
 
             if page_size > space_left:
-                if page_size > CONTEXT_SIZE:  # Here we split a single page into multiple chunks.
-                    page = pages.pop(key)
-                    print(f"{processed}/{total} endpoints converted to code. Encountered large page, chunking into ~{ceil(page_size / CONTEXT_SIZE)}.", end="\r")
-
-                    pages.update({f"{key}-#{i}": page_chunk for i, page_chunk in 
-                        enumerate(chunk_page(client, 
-                                             MODEL,
-                                             page,
-                                             CONTEXT_SIZE))
-                    })
-                    continue
                 break
 
             chunk[key] = pages.pop(key)
             space_left -= page_size
 
-        
-        print(f"{processed}/{total} endpoints converted to code. Chunked {len(chunk)} pages.{CLEARLINE}", end="\r")
+        print(f"{processed}/{total} pages processed. Currently handling {len(chunk)} pages.{CLEARLINE}", end="\r")
         chat_completion = client.chat.completions.create(
             messages=[
                 {
@@ -78,10 +83,17 @@ def extract_schemas(pages: dict[str, str]) -> dict:
             response_format=OPENAI_SCHEMA
         )
 
-        schema = json.loads(chat_completion.choices[0].message.content)
+        try:
+            schema = json.loads(chat_completion.choices[0].message.content)
+        except: 
+            print(schema)
+            exit()
         schemas["endpoints"].extend(schema["endpoints"])
         processed += len(chunk)
-        print(f"{processed}/{total} endpoints converted to code.{CLEARLINE*2}", end="\r")
+        print(f"{processed}/{total} pages processed.{CLEARLINE*2}", end="\r")
+
+    with open("tmp.json", 'w') as f:
+        json.dump(schemas, f, indent=4)
 
     return schemas
 

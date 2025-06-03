@@ -185,7 +185,7 @@
                   UV_PYTHON = "${virtualenv}/bin/python";  # Force uv to use Python interpreter from venv
                 };
 
-                # TODO: This somehow also execs on impure shells. Figure out how/why and whether I would want a true split.
+                # TODO: This somehow also execs on impure shells. Figure out how/why and whether I would want a true split. 
                 shellHook = setup.shellHook + '' 
                   # Get repository root using git. This is expanded at runtime by the editable `.pth` machinery.
                   export REPO_ROOT=$(git rev-parse --show-toplevel)  # TODO: This could be useful for nvim or other tools to find project root.

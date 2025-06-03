@@ -64,7 +64,9 @@ SCHEMA = {
                 "properties": {
                     "name": {
                         "type": "string",
-                        "description": "Name of the endpoint"
+                        "description": "Name of the endpoint",
+                        # "pattern": "\w( \w)+",
+                        "pattern": "[^\"]+",  # Name gets put in a string in code later, this way we don't escape it prematurely.
                     },
                     "url": {
                         "type": "string",
@@ -73,6 +75,10 @@ SCHEMA = {
                     "args_in_url": {
                         "type": "boolean",
                         "description": "Whether any payload information should be in the endpoint URL itself (e.g. '/posts/{userID}/{postID}' instead of '/posts' with userID and postID given in the params)."
+                    },
+                    "method": {
+                        "type": "string",
+                        "enum": ["GET", "DELETE", "INSERT", "UPDATE", "PUT"],
                     },
 
                     "input_parameters": {
@@ -90,7 +96,7 @@ SCHEMA = {
                         "description": "Any additional info needed about this endpoint that isn't already captured by the schema. Use only if necessary."
                     }
                 },
-                "required": ["name", "url", "args_in_url", "input_parameters", "output_parameters", "description"],
+                "required": ["name", "method", "url", "args_in_url", "input_parameters", "output_parameters", "description"],
                 "additionalProperties": False
             },
         },

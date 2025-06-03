@@ -76,7 +76,7 @@ def chunk_page(
         complete (relative to the numbered block).
       - Cut from `cursor` up to the suggested line and repeat until EOF.
     """
-    encoder = tiktoken.encoding_for_model(model_name)
+    encoder = tiktoken.encoding_for_model("gpt-4o")
     chunk_tokens -= context_tokens  # So we're sure not to include and go over actual context window.
 
     raw_lines = page_md.splitlines()

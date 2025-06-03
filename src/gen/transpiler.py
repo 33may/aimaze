@@ -1,3 +1,4 @@
+import re
 from gen.types import Parameter, ParameterType, OutputParameter, OutputParameterType
 
 from jsonschema import validate
@@ -67,7 +68,7 @@ class {class_name}(BaseFunction):
                                            input_data.validated_data)
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = f"Error running function '{name}': {{str(e)}}"
+            error_msg = f"Error running function '{class_name}': {{str(e)}}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
@@ -109,7 +110,7 @@ def wrap_api(schema: dict, base_url: str, api_name: str) -> str:
 
     code = IMPORTS.format(base_url=base_url, api_name=api_name, types_loc="shared")
 
-    code += "".join([ENDPOINT_CODE.format(class_name=endpoint["name"].replace(" ", "_"),
+    code += "".join([ENDPOINT_CODE.format(class_name=re.sub("\W", "", endpoint["name"].replace(" ", "_")),
                                           name=endpoint["name"],
                                           url=endpoint["url"],
                                           args_in_url=endpoint["args_in_url"],
@@ -120,5 +121,5 @@ def wrap_api(schema: dict, base_url: str, api_name: str) -> str:
                                           )
                      for endpoint in schema["endpoints"]])
 
-    print("\n".join([f"{i} {line}" for i, line in enumerate(code.split("\n"))]))
+    # print("\n".join([f"{i} {line}" for i, line in enumerate(code.split("\n"))]))
     return format_str(code, mode=FileMode())
