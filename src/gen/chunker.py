@@ -4,7 +4,7 @@ import json
 from openai import OpenAI
 import tiktoken
 
-DEFAULT_NEIGHBOURHOOD_TOKENS = 2500
+DEFAULT_NEIGHBOURHOOD_TOKENS = 5000
 
 
 def _count_tokens(encoder: tiktoken.Encoding, text: str) -> int:

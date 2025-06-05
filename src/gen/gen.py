@@ -10,7 +10,8 @@ from copy import deepcopy
 
 from schemas import OPENAI_SCHEMA
 import tiktoken
-MODEL = "gpt-4.1-nano"
+# MODEL = "gpt-4.1-nano"
+MODEL = "gpt-4o-2024-08-06"
 ENCODER = tiktoken.encoding_for_model("gpt-4o")
 
  
@@ -47,7 +48,7 @@ def extract_schemas(pages: dict[str, str]) -> dict:
                 enumerate(chunk_page(client, 
                                      MODEL,
                                      page,
-                                     CONTEXT_SIZE - 1000))
+                                     CONTEXT_SIZE - 10000))
             })
 
     schemas = {"endpoints": []}
