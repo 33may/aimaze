@@ -10,9 +10,10 @@ from copy import deepcopy
 
 from schemas import OPENAI_SCHEMA
 import tiktoken
-# MODEL = "gpt-4.1-nano"
-MODEL = "gpt-4o-2024-08-06"
+MODEL = "gpt-4.1-nano"
+# MODEL = "gpt-4o-2024-08-06"
 ENCODER = tiktoken.encoding_for_model("gpt-4o")
+TPM_LIMIT = 30000
 
  
 # Explain general_info in schema for auth more in prompt.
@@ -62,7 +63,7 @@ def extract_schemas(pages: dict[str, str]) -> dict:
         space_left = CONTEXT_SIZE
 
         while pages:  # This second chunker grabs as many chunks (as prepped before as it can fit into 1 call/ctx window)
-            # //TODO fix token per minut 429
+            # //TODO fix token per minute 429
             key = list(pages)[0]
             page = pages[key]
             page_size = len(ENCODER.encode(page))
