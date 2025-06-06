@@ -6,6 +6,14 @@ from urllib.parse import urljoin
 
 from time import sleep
 
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver import Chrome
+
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 failed = 0
 
@@ -37,24 +45,29 @@ def bfs_site(starting_url: str, domain_url="/", auth_info=None, slowdown_s: floa
     return pages
 
 
-def get_content(url: str, auth_info=None) -> str:
-    global failed
+def get_content(url: str, auth_info=None):
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+
+
+    service = Service(ChromeDriverManager().install())
+    driver = Chrome(service=service, options=chrome_options)
 
     try:
-        r = get(url)
+        driver.get(url)
 
-        if not r.status_code == 200:
-            # print(f"Couldn't access page: {url} (HTTP {r.status_code})")
-            failed += 1
+        WebDriverWait(driver, 100).until(
+            EC.presence_of_element_located((By.TAG_NAME, "body"))
+        )
 
-            return ""
+        content = driver.page_source
+    finally:
+        driver.quit()
 
-        return r.content
-    except RequestException as e:
-        # print(f"Couldn't access page: {url}, {e}")
-        failed += 1
-
-        return ""
+    return content
 
 
 def get_all_links(html: str, base_url: str) -> set[str]:
