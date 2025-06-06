@@ -8,6 +8,7 @@ from time import sleep
 
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
+from tqdm import tqdm
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver import Chrome
 
@@ -23,24 +24,44 @@ def bfs_site(starting_url: str, domain_url="/", auth_info=None, slowdown_s: floa
 
     pages = {}
     links = {starting_url}  # Sets so duplicates get filtered automatically.
+    failed = 0
 
     base_url = urljoin(starting_url, domain_url)
     segment = domain_url.replace(urljoin(domain_url, "/"), "")
+
+    bar = tqdm(
+        total=None,
+        desc=f"{segment or '/'} crawl ",
+        unit=" page",
+        leave=False,
+    )
 
     while links:
         link = links.pop()
         # print("Processing", link)
 
-        print(f"{segment}: {len(pages)} pages processed, {len(links)} in queue ({failed} failed).     ", end="\r")
-        html = get_content(link, auth_info)
+        # print(f"{segment}: {len(pages)} pages processed, {len(links)} in queue ({failed} failed).     ", end="\r")
+        try:
+            html = get_content(link, auth_info)
+        except Exception:
+            failed += 1
+            bar.set_postfix(in_queue=len(links), failed=failed)
+            sleep(slowdown_s)
+            continue
+
         pages[link] = md(html)
 
         # Add new links which aren't already processed.
         links |= get_all_links(html, base_url) - set(pages)
 
+        bar.update(1)
+        bar.set_postfix(in_queue=len(links), failed=failed)
+
         sleep(slowdown_s)  # So we don't accidentaly DoS the docs.
-    
-    print(f"Finished scraping {segment} ({len(pages)} successful, {failed} failed).     ")
+
+    bar.close()
+    print(f"Finished scraping {segment or '/'}: "
+          f"{len(pages)} successful, {failed} failed.")
 
     return pages
 
