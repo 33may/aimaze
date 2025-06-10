@@ -2,7 +2,7 @@ import re
 from gen.types import Parameter, ParameterType, OutputParameter, OutputParameterType
 
 from jsonschema import validate
-from schemas import SCHEMA
+from schemas import SCHEMA_PARSE
 from black import format_str, FileMode
 
 
@@ -19,21 +19,17 @@ from dataclasses import dataclass
 @dataclass
 class APIClientConfig:
     \"\"\"Configuration class for API settings\"\"\"
-    consumer_key: str
-    consumer_secret: str
-    api_version: str = "wc/v3"
-
-    auth_type: AuthType
-    verify_ssl: bool = True
-    timeout: int = 30
-    query_string_auth: bool
+{variables}
 
     def get_oauth_params(self, method: str, url: str) -> Dict[str, str]:
-        return {{"key": consumer_key, "secret": consumer_secret}}
+        return {{}}
+
+    def validate(self):
+        # Asserts here
+        pass
 
     def __init__(self):  # Validation on init.
-        assert(all(x is not None for x in [self.consumer_key, self.consumer_secret]), "Missing required API key, check APIClientConfig.")
-
+        self.validate()
 
 api_wrapper = APIWrapper(APIClientConfig(), base_url="{base_url}", name="{api_name}")
     
@@ -105,10 +101,23 @@ def _encode_parameters(params: list, output: bool) -> list[Parameter] | list[Out
      return ",\n\t\t\t".join(params)
 
 
-def wrap_api(schema: dict, base_url: str, api_name: str) -> str:
-    validate(instance=schema, schema=SCHEMA)
+def default_or_none(default: str) -> str:
+    if default == "None": return default
 
-    code = IMPORTS.format(base_url=base_url, api_name=api_name, types_loc="shared")
+    if not default: return "None"
+
+    if not default.startswith('"'):
+        return f'"{default}"'
+
+
+def wrap_api(schema: dict, base_url: str, api_name: str) -> str:
+    validate(instance=schema, schema=SCHEMA_PARSE)
+
+    config_vars = [f"    {v['var_name'].replace('-', '_')}: {v['type']} = {default_or_none(v['default_val'])},  # {v['explanation']}" for v in schema["general_info"]]
+    code = IMPORTS.format(base_url=base_url, 
+                          api_name=api_name, 
+                          types_loc="shared",
+                          variables="\n".join(config_vars))
 
     code += "".join([ENDPOINT_CODE.format(class_name=re.sub("\W", "", endpoint["name"].replace(" ", "_")),
                                           name=endpoint["name"],
@@ -121,5 +130,7 @@ def wrap_api(schema: dict, base_url: str, api_name: str) -> str:
                                           )
                      for endpoint in schema["endpoints"]])
 
+    with open("test/code_raw.py", "w") as f:
+        f.write(code)
     # print("\n".join([f"{i} {line}" for i, line in enumerate(code.split("\n"))]))
     return format_str(code, mode=FileMode())
