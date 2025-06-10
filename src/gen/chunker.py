@@ -3,8 +3,9 @@ import json
 
 from openai import OpenAI
 import tiktoken
+from tqdm import tqdm
 
-DEFAULT_NEIGHBOURHOOD_TOKENS = 2500
+DEFAULT_NEIGHBOURHOOD_TOKENS = 5000
 
 
 def _count_tokens(encoder: tiktoken.Encoding, text: str) -> int:
@@ -86,6 +87,8 @@ def chunk_page(
     chunks: list[str] = []
     cursor = 0  # first unprocessed line index
 
+    pbar = tqdm(total=total_lines, unit=" line")
+
     while cursor < total_lines:
         # Build forward window
         token_fw = 0
@@ -98,6 +101,8 @@ def chunk_page(
         # EOF reached inside hard window → dump rest
         if hard_end >= total_lines:
             # print("EOF hit inside hard window; emitting final chunk")
+            consumed = total_lines - cursor
+            pbar.update(consumed)
             chunks.append("\n".join(raw_lines[cursor:]))
             break
 
@@ -119,6 +124,8 @@ def chunk_page(
         # Forward context hits EOF → dump rest
         if soft_end >= total_lines:
             # print("EOF hit while filling forward context; emitting final chunk")
+            consumed = total_lines - cursor
+            pbar.update(consumed)
             chunks.append("\n".join(raw_lines[cursor:]))
             break
 
@@ -129,11 +136,15 @@ def chunk_page(
         assert cursor < split_line_global <= soft_end, "Invalid split line returned"
         # print(f"Accepted split_line_global={split_line_global}")
 
+        consumed = split_line_global - cursor
+        pbar.update(consumed)
+
         # Emit chunk and advance cursor
         chunks.append("\n".join(raw_lines[cursor:split_line_global]))
         cursor = split_line_global
 
     # print(f"chunk_page finished: {len(chunks)} chunks produced")
+    pbar.close()
     return chunks
 
 

@@ -113,6 +113,18 @@ def default_or_none(default: str) -> str:
 def wrap_api(schema: dict, base_url: str, api_name: str) -> str:
     validate(instance=schema, schema=SCHEMA_PARSE)
 
+    # //TODO fix Fields with a default value must come after any fields without a default.
+    # //TODO fix when using filed of the class use self
+    # def get_oauth_params(self, method: str, url: str) -> Dict[str, str]:
+    #     return {"key": consumer_key, "secret": consumer_secret}
+
+    # should be
+
+    # def get_oauth_params(self, method: str, url: str) -> Dict[str, str]:
+    #     return {"key": self.consumer_key, "secret": self.consumer_secret}
+
+    # //TODO method = GET -> Unresolved reference 'GET'. make it string or import the proper GET method
+
     config_vars = [f"    {v['var_name'].replace('-', '_')}: {v['type']} = {default_or_none(v['default_val'])},  # {v['explanation']}" for v in schema["general_info"]]
     code = IMPORTS.format(base_url=base_url, 
                           api_name=api_name, 

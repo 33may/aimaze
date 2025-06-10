@@ -7,13 +7,38 @@ from gen.gen import extract_schemas, generate_code
 from scrape import bfs_site
 
 
-api_name = "Github Actions"
-base_url = "https://api.github.com/"
-output_file_loc = "test/gh.py"
-documentation_domains = [
-    ("https://docs.github.com/en/rest/actions/artifacts?apiVersion=2022-11-28", "https://docs.github.com/en/rest/actions"),
-    ("https://docs.github.com/en/rest/authentication/endpoints-available-for-github-app-installation-access-tokens?apiVersion=2022-11-28", "https://docs.github.com/en/rest/authentication"),
-]
+# api_name = "Github Actions"
+# base_url = "https://api.github.com/"
+# output_file_loc = "test/gh.py"
+# documentation_domains = [
+#     ("https://docs.github.com/en/rest/actions/artifacts?apiVersion=2022-11-28", "https://docs.github.com/en/rest/actions"),
+#     ("https://docs.github.com/en/rest/authentication/endpoints-available-for-github-app-installation-access-tokens?apiVersion=2022-11-28", "https://docs.github.com/en/rest/authentication"),
+# ]
+
+
+# api_name = "Woo commerce"
+# base_url = "https://woocommerce.github.io/woocommerce-rest-api-docs"
+# output_file_loc = "test/woo_test.py"
+# documentation_domains = [ ("https://woocommerce.github.io/woocommerce-rest-api-docs" , "")]
+
+
+api_name = "WebWinkel"
+base_url = "https://docs.webwinkelkeur.nl"
+output_file_loc = "test/webwinkel.py"
+documentation_domains = [ ("https://docs.webwinkelkeur.nl" , "")]
+
+# api_name = "anewspring"
+# base_url = "https://docs.webwinkelkeur.nl"
+# output_file_loc = "test/webwinkel.py"
+# documentation_domains = [ ("https://docs.webwinkelkeur.nl" , "")]
+
+
+# api_name = "Pipe"
+# base_url = "Https://developers.pipedrive.com"
+# output_file_loc = "test/pipe.py"
+# documentation_domains = [ ("Https://developers.pipedrive.com" , "/docs/api/v1")]
+
+
 
 def main():
     os.system("clear")

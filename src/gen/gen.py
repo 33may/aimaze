@@ -12,12 +12,14 @@ from copy import deepcopy
 from schemas import OPENAI_SCHEMA_FILTER, OPENAI_SCHEMA_PARSE
 import tiktoken
 MODEL = "gpt-4.1-nano"
+# MODEL = "gpt-4o-2024-08-06"
 ENCODER = tiktoken.encoding_for_model("gpt-4o")
+TPM_LIMIT = 30000
 
  
 # Explain general_info in schema for auth more in prompt.
 SCHEMA_EXTRACTION_PROMPT = """
-The markdown section below is part of an API documentation, containing endpoints with their input/output schema's. Convert every endpoint as listed in the documentation into json schema's as instructed below. 
+The markdown section below is part of an API documentation, containing endpoints with their input/output schema's. Convert every endpoint as listed in the documentation into json schema's as instructed below, in the description of every field cover all the information required to use it. If the field is type string and have list of possible values then mention that in description. 
 
 Here is the page you need to parse:
 ```markdown
@@ -83,7 +85,7 @@ def extract_schemas(pages: dict[str, str]) -> dict:
                 enumerate(chunk_page(client, 
                                      MODEL,
                                      page,
-                                     CONTEXT_SIZE - 1000))
+                                     CONTEXT_SIZE - 10000))
             })
 
     schemas = {"endpoints": [], "general_info": []}
@@ -97,6 +99,7 @@ def extract_schemas(pages: dict[str, str]) -> dict:
         space_left = CONTEXT_SIZE
 
         while pages:  # This second chunker grabs as many chunks (as prepped before as it can fit into 1 call/ctx window)
+            # //TODO fix token per minute 429
             key = list(pages)[0]
             page = pages[key]
             page_size = len(ENCODER.encode(page))
@@ -141,6 +144,3 @@ def extract_schemas(pages: dict[str, str]) -> dict:
 def generate_code(schema: dict, base_url: str, api_name: str, output_file_loc: str):
     with open(output_file_loc, "w") as f:
         f.write(wrap_api(schema, base_url, api_name))
-
-# if __name__ == "__main__":
-#     URL = "https://docs.github.com/en/rest/actions/artifacts?apiVersion=2022-11-28"
