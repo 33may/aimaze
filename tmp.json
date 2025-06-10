@@ -1,31 +1,49 @@
 {
     "endpoints": [
         {
-            "name": "Retrieve Ratings Summary",
+            "name": "Retrieve ratings summary as JSON",
             "url": "https://dashboard.webwinkelkeur.nl/api/ratings/retrieve_summary/",
-            "args_in_url": false,
+            "args_in_url": true,
             "method": "GET",
             "input_parameters": [
                 {
                     "name": "id",
                     "required": true,
                     "type": "integer",
-                    "description": "The unique webshop ID. Must be provided as a query parameter."
+                    "description": "The unique webshop ID."
                 },
                 {
                     "name": "code",
                     "required": true,
                     "type": "string",
-                    "description": "Your personal API code. Must be provided as a query parameter."
+                    "description": "Your personal API code."
                 },
                 {
                     "name": "public_code",
                     "required": true,
                     "type": "string",
-                    "description": "Use instead of 'code' when fetching data with JavaScript. Must be provided as a query parameter."
+                    "description": "Use instead of 'code' when fetching data with JavaScript."
                 }
             ],
             "output_parameters": [
+                {
+                    "name": "status",
+                    "is_array": false,
+                    "type": "string",
+                    "description": "Operation status: 'success' or 'error'."
+                },
+                {
+                    "name": "message",
+                    "is_array": false,
+                    "type": "string",
+                    "description": "Additional info about the operation."
+                },
+                {
+                    "name": "data",
+                    "is_array": false,
+                    "type": "object",
+                    "description": "Container for the rating summary details."
+                },
                 {
                     "name": "amount",
                     "is_array": false,
@@ -36,34 +54,58 @@
                     "name": "rating_average",
                     "is_array": false,
                     "type": "float",
-                    "description": "Average rating score on a scale of 1 to 5."
+                    "description": "Average rating on a scale of 1-5."
                 },
                 {
                     "name": "ratings_average",
                     "is_array": false,
                     "type": "object",
-                    "description": "Object containing average scores for specific categories."
+                    "description": "Average ratings per category."
+                },
+                {
+                    "name": "shippingtime",
+                    "is_array": false,
+                    "type": "float",
+                    "description": "Average shipping time rating."
+                },
+                {
+                    "name": "customerservice",
+                    "is_array": false,
+                    "type": "float",
+                    "description": "Average customer service rating."
+                },
+                {
+                    "name": "pricequality",
+                    "is_array": false,
+                    "type": "float",
+                    "description": "Average price-quality rating."
+                },
+                {
+                    "name": "aftersale",
+                    "is_array": false,
+                    "type": "float",
+                    "description": "Average aftersale service rating."
                 }
             ],
-            "description": "Retrieve a summary of ratings for a specific webshop."
+            "description": "API endpoint to retrieve an overall rating summary for a given webshop."
         },
         {
-            "name": "Retrieve Product Reviews in JSON",
-            "url": "https://dashboard.webwinkelkeur.nl/api/product_reviews/retrieve-json/",
-            "args_in_url": false,
+            "name": "Retrieve JSON product reviews",
+            "url": "https://dashboard.webwinkelkeur.nl/api/1.0/product_reviews.json",
+            "args_in_url": true,
             "method": "GET",
             "input_parameters": [
                 {
                     "name": "id",
                     "required": true,
                     "type": "integer",
-                    "description": "The webshop's unique ID."
+                    "description": "The unique webshop ID."
                 },
                 {
                     "name": "code",
                     "required": true,
                     "type": "string",
-                    "description": "Your API code."
+                    "description": "Your personal API code."
                 },
                 {
                     "name": "public_code",
@@ -81,7 +123,7 @@
                     "name": "offset",
                     "required": false,
                     "type": "integer",
-                    "description": "Number of reviews to skip (for pagination)."
+                    "description": "Number of reviews to skip for pagination."
                 },
                 {
                     "name": "limit",
@@ -95,100 +137,94 @@
                     "name": "total",
                     "is_array": false,
                     "type": "integer",
-                    "description": "Total number of reviews."
+                    "description": "Total number of reviews available."
                 },
                 {
                     "name": "product_reviews",
                     "is_array": true,
                     "type": "object",
-                    "description": "List of review objects."
+                    "description": "List of review objects returned."
+                },
+                {
+                    "name": "id",
+                    "is_array": false,
+                    "type": "integer",
+                    "description": "Review ID."
+                },
+                {
+                    "name": "reviewer",
+                    "is_array": false,
+                    "type": "object",
+                    "description": "Reviewer details."
+                },
+                {
+                    "name": "name",
+                    "is_array": false,
+                    "type": "string",
+                    "description": "Name of the reviewer."
+                },
+                {
+                    "name": "email",
+                    "is_array": false,
+                    "type": "string",
+                    "description": "Reviewer email address."
+                },
+                {
+                    "name": "rating",
+                    "is_array": false,
+                    "type": "integer",
+                    "description": "Rating scored, typically 1-5."
+                },
+                {
+                    "name": "review",
+                    "is_array": false,
+                    "type": "string",
+                    "description": "Review text."
+                },
+                {
+                    "name": "product_id",
+                    "is_array": false,
+                    "type": "string",
+                    "description": "Associated product ID."
+                },
+                {
+                    "name": "language",
+                    "is_array": false,
+                    "type": "string",
+                    "description": "Review language code."
+                },
+                {
+                    "name": "deleted",
+                    "is_array": false,
+                    "type": "boolean",
+                    "description": "Deletion status of the review."
+                },
+                {
+                    "name": "created",
+                    "is_array": false,
+                    "type": "string",
+                    "description": "Review creation timestamp."
                 }
             ],
-            "description": "Retrieve a list of product reviews in JSON format."
+            "description": "API endpoint to retrieve a list of product reviews in JSON format."
         },
         {
-            "name": "Add Invitation",
-            "url": "https://dashboard.webwinkelkeur.nl/api/invitations/add/",
-            "args_in_url": false,
+            "name": "Retrieve individual webshop details as JSON",
+            "url": "https://dashboard.webwinkelkeur.nl/api/1.0/webshop.json",
+            "args_in_url": true,
             "method": "GET",
             "input_parameters": [
                 {
                     "name": "id",
                     "required": true,
                     "type": "integer",
-                    "description": "Webshop's unique ID."
+                    "description": "The unique webshop ID."
                 },
                 {
                     "name": "code",
                     "required": true,
                     "type": "string",
-                    "description": "Your API code."
-                },
-                {
-                    "name": "email",
-                    "required": true,
-                    "type": "string",
-                    "description": "Full email address of the customer."
-                },
-                {
-                    "name": "order",
-                    "required": false,
-                    "type": "string",
-                    "description": "Order number."
-                },
-                {
-                    "name": "language",
-                    "required": false,
-                    "type": "string",
-                    "description": "Language code in ISO-639-1 format."
-                },
-                {
-                    "name": "delay",
-                    "required": false,
-                    "type": "integer",
-                    "description": "Delay in days before sending invitation."
-                },
-                {
-                    "name": "customer_name",
-                    "required": false,
-                    "type": "string",
-                    "description": "Name of the customer."
-                },
-                {
-                    "name": "phone_numbers",
-                    "required": false,
-                    "type": "string",
-                    "description": "Comma-separated list of phone numbers."
-                },
-                {
-                    "name": "order_total",
-                    "required": false,
-                    "type": "float",
-                    "description": "Total order amount."
-                },
-                {
-                    "name": "order_data",
-                    "required": false,
-                    "type": "object",
-                    "description": "Additional order data, e.g., product details."
-                },
-                {
-                    "name": "client",
-                    "required": false,
-                    "type": "string",
-                    "description": "Name of the originating software/system."
-                },
-                {
-                    "name": "platform_version",
-                    "required": false,
-                    "type": "string",
-                    "description": "Version of the originating software/system."
-                },
-                {
-                    "name": "plugin_version",
-                    "required": false,
-                    "type": "string",
-                    "description": "Version of the plugin used."
+                    "description": "Your personal API code."
                 }
             ],
             "output_parameters": [
@@ -196,30 +232,120 @@
                     "name": "status",
                     "is_array": false,
                     "type": "string",
-                    "description": "Status of the invitation creation process."
+                    "description": "Operation status."
                 },
                 {
                     "name": "message",
                     "is_array": false,
                     "type": "string",
-                    "description": "Additional info message."
+                    "description": "Details about the retrieval."
+                },
+                {
+                    "name": "data",
+                    "is_array": false,
+                    "type": "object",
+                    "description": "Webshop data object."
+                },
+                {
+                    "name": "name",
+                    "is_array": false,
+                    "type": "string",
+                    "description": "Webshop name."
+                },
+                {
+                    "name": "address",
+                    "is_array": false,
+                    "type": "object",
+                    "description": "Webshop address details."
+                },
+                {
+                    "name": "street",
+                    "is_array": false,
+                    "type": "string",
+                    "description": "Street address."
+                },
+                {
+                    "name": "housenumber",
+                    "is_array": false,
+                    "type": "string",
+                    "description": "Housenumber."
+                },
+                {
+                    "name": "postalcode",
+                    "is_array": false,
+                    "type": "string",
+                    "description": "Postal code."
+                },
+                {
+                    "name": "city",
+                    "is_array": false,
+                    "type": "string",
+                    "description": "City name."
+                },
+                {
+                    "name": "country",
+                    "is_array": false,
+                    "type": "string",
+                    "description": "Country name."
+                },
+                {
+                    "name": "logo",
+                    "is_array": false,
+                    "type": "string",
+                    "description": "URL link to the webshop logo."
+                },
+                {
+                    "name": "languages",
+                    "is_array": true,
+                    "type": "object",
+                    "description": "Supported languages over the webshop."
+                },
+                {
+                    "name": "name",
+                    "is_array": false,
+                    "type": "string",
+                    "description": "Language name."
+                },
+                {
+                    "name": "url",
+                    "is_array": false,
+                    "type": "string",
+                    "description": "Webpage URL for the language."
+                },
+                {
+                    "name": "iso",
+                    "is_array": false,
+                    "type": "string",
+                    "description": "ISO language code."
+                },
+                {
+                    "name": "all",
+                    "is_array": false,
+                    "type": "boolean",
+                    "description": "Indicates if all pages are in this language."
+                },
+                {
+                    "name": "main",
+                    "is_array": false,
+                    "type": "boolean",
+                    "description": "Indicates if this is the main language."
                 }
             ],
-            "description": "Create or schedule an invitation for a customer."
+            "description": "API endpoint to retrieve detailed webshop information."
         }
     ],
     "general_info": [
         {
-            "var_name": "id",
-            "type": "int",
-            "default_val": "None",
-            "explanation": "Webshop ID required for authentication, typically a unique identifier for the service instance or entity."
-        },
-        {
             "var_name": "code",
             "type": "str",
-            "default_val": "None",
-            "explanation": "API key associated with the user account used for authentication, necessary for secure API access."
+            "default_val": "",
+            "explanation": "Personal API access code, used for authentication."
+        },
+        {
+            "var_name": "public_code",
+            "type": "str",
+            "default_val": "",
+            "explanation": "Optional public code to fetch data via JavaScript."
         }
     ]
 }
