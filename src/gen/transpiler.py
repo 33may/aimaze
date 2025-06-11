@@ -61,6 +61,7 @@ class {class_name}(BaseFunction):
         try:
             out = self.api_wrapper.request({class_name}.method, 
                                            {class_name}.url,
+                                           {class_name}.args_in_url,
                                            input_data.validated_data)
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:

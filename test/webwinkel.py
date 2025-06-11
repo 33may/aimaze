@@ -1,11 +1,10 @@
-from shared.FunctionClass import BaseFunction
-from shared.ParameterClass import Parameter, ParameterType
-from shared.OutputParameterClass import OutputParameter, OutputParameterType
-from shared.InputClass import StandardInput
-from shared.OutputClass import StandardOutput
-from shared.BaseClass import APIWrapper, AuthType
+from FunctionClass import BaseFunction
+from ParameterClass import Parameter, ParameterType
+from OutputParameterClass import OutputParameter, OutputParameterType
+from InputClass import StandardInput
+from OutputClass import StandardOutput
+# from BaseClass import AuthType
 from dataclasses import dataclass
-
 
 @dataclass
 class APIClientConfig:
@@ -14,7 +13,7 @@ class APIClientConfig:
     code: str = (None,)  # Personal API access code, used for authentication.
     public_code: str = (None,)  # Optional public code to fetch data via JavaScript.
 
-    def get_oauth_params(self, method: str, url: str) -> Dict[str, str]:
+    def get_oauth_params(self, method: str, url: str) -> dict[str, str]:
         return {}
 
     def validate(self):
@@ -103,6 +102,7 @@ class Retrieve_ratings_summary_as_JSON(BaseFunction):
             out = self.api_wrapper.request(
                 Retrieve_ratings_summary_as_JSON.method,
                 Retrieve_ratings_summary_as_JSON.url,
+                Retrieve_ratings_summary_as_JSON.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
