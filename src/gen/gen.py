@@ -1,3 +1,4 @@
+import time
 from pprint import pprint
 from urllib.parse import urljoin
 from openai import OpenAI
@@ -11,10 +12,17 @@ from copy import deepcopy
 
 from schemas import OPENAI_SCHEMA_FILTER, OPENAI_SCHEMA_PARSE
 import tiktoken
+
+from gen.limit_utils import SlidingWindowRateLimiter
+
 MODEL = "gpt-4.1-nano"
 # MODEL = "gpt-4o-2024-08-06"
 ENCODER = tiktoken.encoding_for_model("gpt-4o")
-TPM_LIMIT = 30000
+
+# https://platform.openai.com/settings/organization/limits
+TPM_LIMIT = 200000 # 4.1-nane
+# TPM_LIMIT = 30000 # 4o
+tpm_limiter = SlidingWindowRateLimiter(tpm_limit=TPM_LIMIT)
 
  
 # Explain general_info in schema for auth more in prompt.
@@ -99,7 +107,6 @@ def extract_schemas(pages: dict[str, str]) -> dict:
         space_left = CONTEXT_SIZE
 
         while pages:  # This second chunker grabs as many chunks (as prepped before as it can fit into 1 call/ctx window)
-            # //TODO fix token per minute 429
             key = list(pages)[0]
             page = pages[key]
             page_size = len(ENCODER.encode(page))
@@ -109,6 +116,8 @@ def extract_schemas(pages: dict[str, str]) -> dict:
 
             chunk[key] = pages.pop(key)
             space_left -= page_size
+
+        tpm_limiter.wait_until_budget_allows(page_size)
 
         print(f"{processed}/{total} pages processed. Currently handling {len(chunk)} pages.{CLEARLINE}", end="\r")
         chat_completion = client.chat.completions.create(
@@ -124,6 +133,12 @@ def extract_schemas(pages: dict[str, str]) -> dict:
 
         try:
             schema = json.loads(chat_completion.choices[0].message.content)
+
+            actual_tokens = chat_completion.usage.total_tokens
+            now = time.time()
+            with tpm_limiter._lock:
+                tpm_limiter._token_events.pop()
+                tpm_limiter._token_events.append((now, actual_tokens)) # replace estimate with actual usage
         except: 
             with open("test/crash.py", "w") as f:
                 f.write(chat_completion.choices[0].message.content)
