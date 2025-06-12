@@ -7,13 +7,22 @@ from black import format_str, FileMode
 
 
 IMPORTS = """
-from {types_loc}.FunctionClass import BaseFunction
-from {types_loc}.ParameterClass import Parameter, ParameterType
-from {types_loc}.OutputParameterClass import OutputParameter, OutputParameterType
-from {types_loc}.InputClass import StandardInput
-from {types_loc}.OutputClass import StandardOutput
-from {types_loc}.BaseClass import APIWrapper, AuthType
+from FunctionClass import BaseFunction
+from ParameterClass import Parameter, ParameterType
+from OutputParameterClass import OutputParameter, OutputParameterType
+from InputClass import StandardInput
+from OutputClass import StandardOutput
+from BaseClass import APIWrapper
+
+# from {types_loc}.FunctionClass import BaseFunction
+# from {types_loc}.ParameterClass import Parameter, ParameterType
+# from {types_loc}.OutputParameterClass import OutputParameter, OutputParameterType
+# from {types_loc}.InputClass import StandardInput
+# from {types_loc}.OutputClass import StandardOutput
+# from {types_loc}.BaseClass import APIWrapper, AuthType
+
 from dataclasses import dataclass
+import logging
         
 
 @dataclass
@@ -21,7 +30,7 @@ class APIClientConfig:
     \"\"\"Configuration class for API settings\"\"\"
 {variables}
 
-    def get_oauth_params(self, method: str, url: str) -> Dict[str, str]:
+    def get_oauth_params(self, method: str, url: str) -> dict[str, str]:
         return {{}}
 
     def validate(self):

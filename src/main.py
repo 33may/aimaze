@@ -22,10 +22,16 @@ from scrape import bfs_site
 # documentation_domains = [ ("https://woocommerce.github.io/woocommerce-rest-api-docs" , "")]
 
 
-api_name = "WebWinkel"
-base_url = "https://docs.webwinkelkeur.nl"
-output_file_loc = "test/webwinkel.py"
-documentation_domains = [ ("https://docs.webwinkelkeur.nl" , "")]
+api_name = "Spotify"
+base_url = "https://developer.spotify.com/documentation/web-api"
+output_file_loc = "test/spotify.py"
+documentation_domains = [ ("https://developer.spotify.com/documentation/web-api" , "")]
+
+
+# api_name = "WebWinkel"
+# base_url = "https://docs.webwinkelkeur.nl"
+# output_file_loc = "test/webwinkel.py"
+# documentation_domains = [ ("https://docs.webwinkelkeur.nl" , "")]
 
 # api_name = "anewspring"
 # base_url = "https://docs.webwinkelkeur.nl"
