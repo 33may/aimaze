@@ -50,5 +50,5 @@ class SlidingWindowRateLimiter:
                 # Oldest event dictates when budget frees up
                 sleep_for = self.window_seconds - (now - self._token_events[0][0]) + 0.05
 
-            print(f"Waiting {sleep_for} seconds until budget is reached.")
+            print(f"Waiting {sleep_for:.1f}s for token rate limit.")
             time.sleep(sleep_for)

@@ -16,71 +16,66 @@ from dataclasses import dataclass
 import logging
 
 
+METHODS = {"GET": get, "POST": post}
+
+
 @dataclass
 class APIClientConfig:
     """Configuration class for API settings"""
 
-    type: str = (
-        None,
-    )  # Must be either `artist`, `user`, or `'user'` depending on context; specify object type.
-    ids: str = (
-        None,
-    )  # Comma-separated list of Spotify IDs used for various endpoints, with a maximum count of 50, to identify artists, tracks, shows, or users.
-    limit: int = (
-        "20",
-    )  # Number of items to return per request, with typical range from 1 to 100 or 50 depending on endpoint.
-    market: str = (
-        None,
-    )  # ISO 3166-1 alpha-2 country code to filter content or specify market, defaulting to user's country if not provided.
-    seed_artists: str = (
-        None,
-    )  # Comma-separated list of Spotify artist IDs to seed recommendations.
-    seed_genres: str = (
-        None,
-    )  # Comma-separated list of genres to seed recommendations.
-    seed_tracks: str = (
-        None,
-    )  # Comma-separated list of Spotify track IDs to seed recommendations.
-    device_id: str = (
-        None,
-    )  # ID of the device to target for playback operations; optional.
-    locale: str = (
-        None,
-    )  # Locale string in ISO 639-1 and ISO 3166-1 alpha-2 for language-specific responses.
-    id: str = (
-        None,
-    )  # The Spotify ID of a specific resource such as track, album, show, or category.
-    offset: int = ("0",)  # Index of the first item to return, used for pagination.
-    position_ms: int = (
-        None,
-    )  # Position in milliseconds to seek to within the current track.
-    category_id: str = (
-        None,
-    )  # Identifier for specific category; used in category-related endpoints.
-    country: str = (
-        None,
-    )  # ISO 3166-1 alpha-2 country code indicating user's country, used for regional content filtering.
-    display_name: str = (None,)  # User's display name; null if not available.
-    email: str = (None,)  # User's email address; available only if scope is granted.
-    explicit_content: int = (None,)  # Explicit content settings object or flag.
-    external_urls: str = (None,)  # External URLs associated with the user.
-    followers_total: int = ("0",)  # Number of followers the user has.
-    href: str = (None,)  # API link to the user's profile.
-    images_url: str = (None,)  # URL of the user's profile image.
-    product: str = (None,)  # Subscription level: e.g., premium, free.
-    uri: str = (None,)  # Spotify URI for the user or resource.
-    state: int = (
-        None,
-    )  # Boolean as integer indicating shuffle state; true (1) to shuffle, false (0) to not.
-    playlist_id: str = (None,)  # Spotify ID of the playlist to fetch items from.
-    fields: str = (None,)  # Specific data fields to include in the response.
-    additional_types: str = (
-        None,
-    )  # Additional content types supported besides 'track', such as 'episode'.
-    category_id: str = (
-        None,
-    )  # Identifier for a category, used to fetch related playlists or items.
-    body: str = (None,)  # JSON payload, such as list of IDs for batch operations.
+    base_url = "https://developer.spotify.com/documentation/web-api"
+    name = "Spotify"
+
+    # OAuth 2.0 access token with appropriate scopes to authorize API calls. Used for authenticated requests.
+    access_token: str = None
+
+    # Your Spotify application's client ID, used for authentication during authorization flows.
+    client_id: str = None
+
+    # Your Spotify application's client secret, used for authentication during authorization flows.
+    client_secret: str = None
+
+    # The URL to redirect to after authentication, must match the one set in your Spotify app settings.
+    redirect_uri: str = None
+
+    # Optional ISO country code filter for content availability and market-specific data.
+    market: str = None
+
+    # Maximum number of items to return; default is 20, range typically from 1 to 50.
+    limit: int = None
+
+    # Index of the first result to return, used for pagination.
+    offset: int = None
+
+    # The Spotify ID of a playlist to retrieve or modify, consistent across endpoints.
+    playlist_id: str = None
+
+    # Comma-separated list of Spotify IDs used for bulk operations like checking presence or removing items.
+    ids: str = None
+
+    # The name of a playlist or item, used when creating or renaming.
+    name: str = None
+
+    # Boolean string indicating if the playlist is public ('true') or private ('false').
+    public: str = None
+
+    # Boolean string to set playlist as collaborative or not.
+    collaborative: str = None
+
+    # Playlist description or item description.
+    description: str = None
+
+    # ID of the device targeted for playback commands.
+    device_id: str = None
+
+    # Boolean indicator ('true'/'false') to start playback on the specified device.
+    play: str = None
+
+    # Spotify ID of the resource, such as an artist, album, show, or episode.
+    id: str = None
+
+    # Locale string for localization purposes, such as language codes.
+    locale: str = None
 
     def get_oauth_params(self, method: str, url: str) -> dict[str, str]:
         return {}
@@ -89,19 +84,32 @@ class APIClientConfig:
         # Asserts here
         pass
 
-    def __init__(self):  # Validation on init.
+    def authenticate(self):
+        # For authentication done before calls, not during.
+        pass
+
+    def __init__(self):
         self.validate()
+        self.authenticate()
 
+    def request(
+        self, method: str, url: str, args_in_url: bool, data: dict
+    ) -> dict[str, any]:
+        if args_in_url:
+            url = url.format(
+                **data
+            )  # TODO: Take in-url args out of payload. Probably best with template string.
 
-api_wrapper = APIWrapper(
-    APIClientConfig(),
-    base_url="https://developer.spotify.com/documentation/web-api",
-    name="Spotify",
-)
+        response = METHODS[method](url, data=data)
+
+        if response.status_code != 200:
+            raise Exception(response.text)
+
+        return json.loads(response.text)
 
 
 class Add_Item_to_Playback_Queue(BaseFunction):
-    """Adds an item (track or episode) to the user's playback queue. Requires 'user-modify-playback-state' scope."""
+    """Endpoint to add an item (track or episode) to the user's current playback queue. Requires 'user-modify-playback-state' scope."""
 
     name = "Add Item to Playback Queue"
     url = "https://api.spotify.com/v1/me/player/queue"
@@ -109,24 +117,35 @@ class Add_Item_to_Playback_Queue(BaseFunction):
     method = "PUT"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="uri", param_type=ParameterType.STRING, required=True
-            ),  # The URI of the item to add to the queue. Must be a track or an episode URI. Example: 'spotify:track:4iV5W9uYEdYUVa79Axb7Rh',
+            ),  # The URI of the item to add to the queue. Must be a track or an episode URI, e.g., 'spotify:track:4iV5W9uYEdYUVa79Axb7Rh'.,
             Parameter(
                 name="device_id", param_type=ParameterType.STRING, required=False
-            ),  # The ID of the device to target. If not provided, the currently active device will be used. Example: '0d1841b0976bae2a3a310dd74c0f3df354899bc8'
+            ),  # The ID of the device to target. If not specified, the currently active device will be used. Example: '0d1841b0976bae2a3a310dd74c0f3df354899bc8'.
         ]
 
     def get_output_schema(self):
-        return []
+        return [
+            OutputParameter(
+                name="status_code",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # HTTP response status code indicating the result of the request.,
+            OutputParameter(
+                name="response_message",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Optional message associated with the response, such as error details.
+        ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Add_Item_to_Playback_Queue.method,
                 Add_Item_to_Playback_Queue.url,
                 Add_Item_to_Playback_Queue.args_in_url,
@@ -140,7 +159,7 @@ class Add_Item_to_Playback_Queue(BaseFunction):
 
 
 class Get_Several_Tracks(BaseFunction):
-    """Retrieves information for multiple tracks based on their Spotify IDs. Requires 'user-read-private' or 'user-read-email' scope."""
+    """Endpoint to retrieve metadata for multiple tracks based on their Spotify IDs. Requires 'user-read-private' or 'user-read-email' scope."""
 
     name = "Get Several Tracks"
     url = "https://api.spotify.com/v1/tracks"
@@ -148,28 +167,28 @@ class Get_Several_Tracks(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="market", param_type=ParameterType.STRING, required=False
-            ),  # An ISO 3166-1 alpha-2 country code to filter tracks available in that market. Example: 'ES',
+            ),  # An ISO 3166-1 alpha-2 country code to filter track availability. Example: 'ES'.,
             Parameter(
                 name="ids", param_type=ParameterType.STRING, required=True
-            ),  # A comma-separated list of Spotify IDs for the tracks. Maximum: 50 IDs. Example: '7ouMYWpwJ422jRcDASZB7P,1301WleyT98MSxVHPZCA6M'
+            ),  # A comma-separated list of Spotify track IDs. Maximum: 50 IDs. Example: '7ouMYWpwJ422jRcDASZB7P,4VqPOruhp5EdPBeR92t6lQ,2takcwOaAZWiXQijPHIx7B'.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
                 name="tracks", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Array of track objects, each containing detailed information about a track.
+            ),  # An array of track objects, each containing details such as album, artists, duration, etc.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_Several_Tracks.method,
                 Get_Several_Tracks.url,
                 Get_Several_Tracks.args_in_url,
@@ -183,7 +202,7 @@ class Get_Several_Tracks(BaseFunction):
 
 
 class Check_if_User_Follows_Playlist(BaseFunction):
-    """Checks if the current user is following the specified playlist. Requires 'playlist-read-private' scope."""
+    """Endpoint to check if the current user follows a specific playlist. Requires 'playlist-read-private' scope."""
 
     name = "Check if User Follows Playlist"
     url = "https://api.spotify.com/v1/playlists/{playlist_id}/followers/contains"
@@ -191,28 +210,28 @@ class Check_if_User_Follows_Playlist(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="playlist_id", param_type=ParameterType.STRING, required=True
-            ),  # The Spotify ID of the playlist. Example: '3cEYpjA9oz9GiPac4AsH4n',
+            ),  # The Spotify ID of the playlist. Example: '3cEYpjA9oz9GiPac4AsH4n'.,
             Parameter(
                 name="ids", param_type=ParameterType.STRING, required=True
-            ),  # A comma-separated list containing the Spotify Username of the current user. Maximum: 1 ID. Example: 'jmperezperez'
+            ),  # A comma-separated list containing the current user's Spotify username. Maximum 1 ID. Example: 'jmperezperez'.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
                 name="follows", param_type=OutputParameterType.BOOLEAN, is_array=True
-            ),  # An array containing a single boolean indicating if the user follows the playlist.
+            ),  # An array with a single boolean indicating whether the current user follows the playlist. Example: [true].
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Check_if_User_Follows_Playlist.method,
                 Check_if_User_Follows_Playlist.url,
                 Check_if_User_Follows_Playlist.args_in_url,
@@ -228,35 +247,38 @@ class Check_if_User_Follows_Playlist(BaseFunction):
 
 
 class Unfollow_Artists_or_Users(BaseFunction):
-    """Remove the current user as a follower of one or more artists or other Spotify users."""
+    """Removes the current user as a follower of specified artists or users. Requires 'user-follow-modify' scope."""
 
     name = "Unfollow Artists or Users"
     url = "https://api.spotify.com/v1/me/followingtype"
-    args_in_url = False
+    args_in_url = True
     method = "DELETE"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="type", param_type=ParameterType.STRING, required=True
-            ),  # The ID type: either `artist` or `user`. Allowed values: "artist", "user".,
+            ),  # The ID type: either 'artist' or 'user'. Allowed values: "artist", "user". This parameter should be included in the URL path.,
             Parameter(
                 name="ids", param_type=ParameterType.STRING, required=True
-            ),  # A comma-separated list of the artist or user Spotify IDs. Example: `ids=74ASZWbe4lXaubB36ztrGX,08td7MxkoHQkXnWAYD8d6Q`. Max of 50 IDs.,
-            Parameter(
-                name="body", param_type=OutputParameterType.OBJECT, required=False
-            ),  # Request body supporting a JSON array of IDs.
+            ),  # A comma-separated list of the artist or user Spotify IDs. A maximum of 50 IDs can be sent in one request. Example: '74ASZWbe4lXaubB36ztrGX,08td7MxkoHQkXnWAYD8d6Q'.
         ]
 
     def get_output_schema(self):
-        return []
+        return [
+            OutputParameter(
+                name="status_code",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # HTTP response status code. 204 indicates success; other codes indicate errors.
+        ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Unfollow_Artists_or_Users.method,
                 Unfollow_Artists_or_Users.url,
                 Unfollow_Artists_or_Users.args_in_url,
@@ -270,7 +292,7 @@ class Unfollow_Artists_or_Users(BaseFunction):
 
 
 class Get_Available_Genre_Seeds(BaseFunction):
-    """Retrieve a list of available genre seed parameter values for recommendations, deprecated."""
+    """Retrieves a list of available genre seed values for use in recommendations. This endpoint is deprecated."""
 
     name = "Get Available Genre Seeds"
     url = "https://api.spotify.com/documentation/web-api/reference/check-users-saved-shows"
@@ -278,7 +300,7 @@ class Get_Available_Genre_Seeds(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return []
@@ -287,12 +309,12 @@ class Get_Available_Genre_Seeds(BaseFunction):
         return [
             OutputParameter(
                 name="genres", param_type=OutputParameterType.STRING, is_array=True
-            ),  # An array of available genre seed parameter values for recommendations.
+            ),  # A list of available genre seed parameter values for recommendations. Example: ['alternative','samba'].
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_Available_Genre_Seeds.method,
                 Get_Available_Genre_Seeds.url,
                 Get_Available_Genre_Seeds.args_in_url,
@@ -306,48 +328,48 @@ class Get_Available_Genre_Seeds(BaseFunction):
 
 
 class Search_for_Item(BaseFunction):
-    """Performs a search across Spotify catalogs, matching the provided query string with specified item types."""
+    """Endpoint to search for items in Spotify's catalog, matching a keyword string with optional filters."""
 
     name = "Search for Item"
-    url = "https://api.spotify.com/v1/search"
+    url = "/search"
     args_in_url = True
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="q", param_type=ParameterType.STRING, required=True
-            ),  # Your search query. Use field filters to narrow down your search. Available filters include 'album', 'artist', 'track', 'year', 'upc', 'tag:hipster', 'tag:new', 'isrc', and 'genre'. The query supports URL encoding.,
+            ),  # Your search query. You can refine the search with field filters like `album`, `artist`, `track`, `year`, `upc`, `tag:hipster`, `tag:new`, `isrc`, and `genre`. Filters apply to specific result types. For example: `q=remaster%20track:Doxy%20artist:Miles%20Davis`.,
             Parameter(
                 name="type", param_type=ParameterType.STRING, required=True
             ),  # A comma-separated list of item types to search across. Allowed values: "album", "artist", "playlist", "track", "show", "episode", "audiobook".,
             Parameter(
                 name="market", param_type=ParameterType.STRING, required=False
-            ),  # An ISO 3166-1 alpha-2 country code to filter results by market. If not provided, default market or user’s country setting is used.,
+            ),  # An ISO 3166-1 alpha-2 country code to filter results to a specific market. If omitted, defaults to the user's country.,
             Parameter(
                 name="limit", param_type=ParameterType.INTEGER, required=False
-            ),  # Maximum number of results to return per item type. Default is 20. Range: 0-50.,
+            ),  # Maximum number of results to return. Default is 20. Range: 0-50.,
             Parameter(
                 name="offset", param_type=ParameterType.INTEGER, required=False
-            ),  # Index of the first result to return. Useful for paging. Default is 0. Range: 0-1000.,
+            ),  # Index of the first result to return. Default is 0. Range: 0-1000.,
             Parameter(
                 name="include_external", param_type=ParameterType.STRING, required=False
-            ),  # Set to 'audio' to include externally hosted audio content in the results. Allowed value: "audio".
+            ),  # If set to 'audio', includes externally hosted audio content in the results.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
-                name="tracks", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # The result object containing search hits for various item types.
+                name="tracks", param_type=OutputParameterType.OBJECT, is_array=True
+            ),  # Object containing paginated list of search results for tracks, albums, artists, playlists, shows, episodes, or audiobooks based on the search.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Search_for_Item.method,
                 Search_for_Item.url,
                 Search_for_Item.args_in_url,
@@ -359,22 +381,17 @@ class Search_for_Item(BaseFunction):
             logging.error(error_msg)
             raise ValueError(error_msg)
 
-import base64
-s = Search_for_Item()
-s_i = StandardInput(raw_data={"q": "CAN Saw Delight", "type": "album"}, parameter_schema=s.get_parameter_schema())
-print(s.process(s_i))
-
 
 class Get_Playlist_Cover_Image(BaseFunction):
-    """Retrieves the current images associated with a specific playlist, such as cover art."""
+    """Get the current images associated with a specific playlist, specified by its Spotify ID."""
 
     name = "Get Playlist Cover Image"
-    url = "https://api.spotify.com/v1/playlists/{playlist_id}/images"
+    url = "/playlists/{playlist_id}/images"
     args_in_url = True
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
@@ -401,7 +418,7 @@ class Get_Playlist_Cover_Image(BaseFunction):
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_Playlist_Cover_Image.method,
                 Get_Playlist_Cover_Image.url,
                 Get_Playlist_Cover_Image.args_in_url,
@@ -414,50 +431,50 @@ class Get_Playlist_Cover_Image(BaseFunction):
             raise ValueError(error_msg)
 
 
-class Get_users_saved_episodes(BaseFunction):
-    """Retrieves a list of episodes saved in the current user's library."""
+class Get_Users_Saved_Episodes(BaseFunction):
+    """Retrieves a list of episodes saved in the current Spotify user's library."""
 
-    name = "Get user's saved episodes"
+    name = "Get User's Saved Episodes"
     url = "https://api.spotify.com/v1/me/episodes"
     args_in_url = False
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="market", param_type=ParameterType.STRING, required=False
-            ),  # An ISO 3166-1 alpha-2 country code, e.g., 'ES'. If specified, only content available in that market is returned. If omitted, defaults to user's country.,
+            ),  # An ISO 3166-1 alpha-2 country code. If specified, only content available in that market will be returned. If not provided, the user's country will take priority over this parameter.,
             Parameter(
                 name="limit", param_type=ParameterType.INTEGER, required=False
-            ),  # Maximum number of items to return. Default is 20. Range: 1-50.,
+            ),  # Maximum number of items to return (default: 20, min: 1, max: 50).,
             Parameter(
                 name="offset", param_type=ParameterType.INTEGER, required=False
-            ),  # The index of the first item to return. Default is 0.
+            ),  # The index of the first item to return (default: 0). Used with 'limit' to paginate results.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
                 name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Link to the Web API endpoint returning the full result.,
+            ),  # A link to the Web API endpoint returning the full result of the request.,
             OutputParameter(
                 name="limit", param_type=OutputParameterType.INTEGER, is_array=False
             ),  # Maximum number of items in the response.,
             OutputParameter(
                 name="next", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to the next page of results or null if none.,
+            ),  # URL to the next page of items, null if none.,
             OutputParameter(
                 name="offset", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Offset of the items returned.,
+            ),  # Index of the first item in the response.,
             OutputParameter(
                 name="previous", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to the previous page or null if none.,
+            ),  # URL to the previous page of items, null if none.,
             OutputParameter(
                 name="total", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Total number of saved episodes available.,
+            ),  # Total number of items available.,
             OutputParameter(
                 name="items", param_type=OutputParameterType.OBJECT, is_array=True
             ),  # Array of saved episode objects.
@@ -465,324 +482,82 @@ class Get_users_saved_episodes(BaseFunction):
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Get_users_saved_episodes.method,
-                Get_users_saved_episodes.url,
-                Get_users_saved_episodes.args_in_url,
+            out = self.api_config.request(
+                Get_Users_Saved_Episodes.method,
+                Get_Users_Saved_Episodes.url,
+                Get_Users_Saved_Episodes.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = f"Error running function 'Get_users_saved_episodes': {str(e)}"
+            error_msg = f"Error running function 'Get_Users_Saved_Episodes': {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
-class Check_if_episodes_are_saved_in_users_library(BaseFunction):
-    """Checks if one or more episodes are saved in the current user's library."""
+class Check_if_Episodes_are_Saved(BaseFunction):
+    """Checks if one or more episodes are already saved in the user's library."""
 
-    name = "Check if episodes are saved in user's library"
+    name = "Check if Episodes are Saved"
     url = "https://api.spotify.com/v1/me/episodes/contains"
     args_in_url = False
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="ids", param_type=ParameterType.STRING, required=True
-            ),  # Comma-separated list of Spotify episode IDs, maximum 50. Example: '77o6BIVlYM3msb4MMIL1jH,0Q86acNRm6V9GYx55SXKwf'.
+            ),  # A comma-separated list of Spotify episode IDs, with a maximum of 50 IDs.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
-                name="", param_type=OutputParameterType.BOOLEAN, is_array=True
-            ),  # Array of booleans indicating if each episode ID is saved (true) or not (false).
+                name="array_of_booleans",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=True,
+            ),  # Array indicating for each ID whether it is saved (true) or not (false) in the user's library.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Check_if_episodes_are_saved_in_users_library.method,
-                Check_if_episodes_are_saved_in_users_library.url,
-                Check_if_episodes_are_saved_in_users_library.args_in_url,
-                input_data.validated_data,
-            )
-            return StandardOutput(out, self.get_output_schema())
-        except Exception as e:
-            error_msg = f"Error running function 'Check_if_episodes_are_saved_in_users_library': {str(e)}"
-            logging.error(error_msg)
-            raise ValueError(error_msg)
-
-
-class Set_volume_for_users_current_playback_device(BaseFunction):
-    """Sets the volume for the user's current playback device. Works only for Spotify Premium users."""
-
-    name = "Set volume for user's current playback device"
-    url = "https://api.spotify.com/v1/me/player/volume"
-    args_in_url = False
-    method = "PUT"
-
-    def __init__(self):
-        self.api_wrapper = api_wrapper
-
-    def get_parameter_schema(self):
-        return [
-            Parameter(
-                name="volume_percent", param_type=ParameterType.INTEGER, required=True
-            ),  # Volume to set, range 0-100.,
-            Parameter(
-                name="device_id", param_type=ParameterType.STRING, required=False
-            ),  # ID of the target device. If omitted, the currently active device is used.
-        ]
-
-    def get_output_schema(self):
-        return []
-
-    def process(self, input_data: StandardInput) -> StandardOutput:
-        try:
-            out = self.api_wrapper.request(
-                Set_volume_for_users_current_playback_device.method,
-                Set_volume_for_users_current_playback_device.url,
-                Set_volume_for_users_current_playback_device.args_in_url,
-                input_data.validated_data,
-            )
-            return StandardOutput(out, self.get_output_schema())
-        except Exception as e:
-            error_msg = f"Error running function 'Set_volume_for_users_current_playback_device': {str(e)}"
-            logging.error(error_msg)
-            raise ValueError(error_msg)
-
-
-class Check_Users_Saved_Audiobooks_GET_meaudiobookscontains(BaseFunction):
-    """Checks if one or more audiobooks are saved in the current user's library. Requires 'user-library-read' scope."""
-
-    name = "Check User's Saved Audiobooks (GET /me/audiobooks/contains)"
-    url = "https://api.spotify.com/v1/me/audiobooks/contains"
-    args_in_url = False
-    method = "GET"
-
-    def __init__(self):
-        self.api_wrapper = api_wrapper
-
-    def get_parameter_schema(self):
-        return [
-            Parameter(
-                name="ids", param_type=ParameterType.STRING, required=True
-            ),  # A comma-separated list of Spotify IDs for audiobooks. Maximum: 50 IDs. Example: '18yVqkdbdRvS24c0Ilj2ci,1HGw3J3NxZO1TP1BTtVhpZ',
-            Parameter(
-                name="limit", param_type=ParameterType.INTEGER, required=False
-            ),  # Number of items to return (default 20, min 1, max 50).
-        ]
-
-    def get_output_schema(self):
-        return [
-            OutputParameter(
-                name="response", param_type=OutputParameterType.BOOLEAN, is_array=True
-            ),  # An array of booleans indicating if each audiobooks ID is saved in the user's library. Example: [false,true]
-        ]
-
-    def process(self, input_data: StandardInput) -> StandardOutput:
-        try:
-            out = self.api_wrapper.request(
-                Check_Users_Saved_Audiobooks_GET_meaudiobookscontains.method,
-                Check_Users_Saved_Audiobooks_GET_meaudiobookscontains.url,
-                Check_Users_Saved_Audiobooks_GET_meaudiobookscontains.args_in_url,
-                input_data.validated_data,
-            )
-            return StandardOutput(out, self.get_output_schema())
-        except Exception as e:
-            error_msg = f"Error running function 'Check_Users_Saved_Audiobooks_GET_meaudiobookscontains': {str(e)}"
-            logging.error(error_msg)
-            raise ValueError(error_msg)
-
-
-class Get_Users_Saved_Shows_GET_meshows(BaseFunction):
-    """Retrieves a list of shows saved in the current user's library. Requires 'user-library-read' scope."""
-
-    name = "Get User's Saved Shows (GET /me/shows)"
-    url = "https://api.spotify.com/v1/me/shows"
-    args_in_url = False
-    method = "GET"
-
-    def __init__(self):
-        self.api_wrapper = api_wrapper
-
-    def get_parameter_schema(self):
-        return [
-            Parameter(
-                name="limit", param_type=ParameterType.INTEGER, required=False
-            ),  # Maximum number of items to return. Default 20, min 1, max 50.,
-            Parameter(
-                name="offset", param_type=ParameterType.INTEGER, required=False
-            ),  # The index of the first item to return. Default 0.
-        ]
-
-    def get_output_schema(self):
-        return [
-            OutputParameter(
-                name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Link to the Web API endpoint returning full result.,
-            OutputParameter(
-                name="limit", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Maximum number of items in response.,
-            OutputParameter(
-                name="next", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to next page of items, or null.,
-            OutputParameter(
-                name="offset", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # The offset of the items returned.,
-            OutputParameter(
-                name="previous", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to previous page, or null.,
-            OutputParameter(
-                name="total", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Total number of saved shows.,
-            OutputParameter(
-                name="items", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Array of saved show objects.
-        ]
-
-    def process(self, input_data: StandardInput) -> StandardOutput:
-        try:
-            out = self.api_wrapper.request(
-                Get_Users_Saved_Shows_GET_meshows.method,
-                Get_Users_Saved_Shows_GET_meshows.url,
-                Get_Users_Saved_Shows_GET_meshows.args_in_url,
+            out = self.api_config.request(
+                Check_if_Episodes_are_Saved.method,
+                Check_if_Episodes_are_Saved.url,
+                Check_if_Episodes_are_Saved.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
             error_msg = (
-                f"Error running function 'Get_Users_Saved_Shows_GET_meshows': {str(e)}"
+                f"Error running function 'Check_if_Episodes_are_Saved': {str(e)}"
             )
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
-class Remove_Users_Saved_Shows_DELETE_meshows(BaseFunction):
-    """Deletes one or more shows from the current user's library. Requires 'user-library-modify' scope."""
+class Set_Playback_Volume(BaseFunction):
+    """Sets the volume for the user's current playback device."""
 
-    name = "Remove User's Saved Shows (DELETE /me/shows)"
-    url = "https://api.spotify.com/v1/me/shows"
-    args_in_url = False
-    method = "DELETE"
-
-    def __init__(self):
-        self.api_wrapper = api_wrapper
-
-    def get_parameter_schema(self):
-        return [
-            Parameter(
-                name="ids", param_type=ParameterType.STRING, required=True
-            ),  # A comma-separated list of Spotify IDs for shows to remove. Maximum: 50 IDs. Example: '5CfCWKI5pZ28U0uOzXkDHe,5as3aKmN2k11yfDDDSrvaZ',
-            Parameter(
-                name="market", param_type=ParameterType.STRING, required=False
-            ),  # ISO 3166-1 alpha-2 country code to specify the market. If not provided, user country will be used.
-        ]
-
-    def get_output_schema(self):
-        return [
-            OutputParameter(
-                name="response", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # Empty response body indicates successful removal.
-        ]
-
-    def process(self, input_data: StandardInput) -> StandardOutput:
-        try:
-            out = self.api_wrapper.request(
-                Remove_Users_Saved_Shows_DELETE_meshows.method,
-                Remove_Users_Saved_Shows_DELETE_meshows.url,
-                Remove_Users_Saved_Shows_DELETE_meshows.args_in_url,
-                input_data.validated_data,
-            )
-            return StandardOutput(out, self.get_output_schema())
-        except Exception as e:
-            error_msg = f"Error running function 'Remove_Users_Saved_Shows_DELETE_meshows': {str(e)}"
-            logging.error(error_msg)
-            raise ValueError(error_msg)
-
-
-class Get_Users_Saved_Albums_GET_mealbums(BaseFunction):
-    """Retrieves a list of albums saved in the current user's library. Requires 'user-library-read' scope."""
-
-    name = "Get User's Saved Albums (GET /me/albums)"
-    url = "https://api.spotify.com/v1/me/albums"
-    args_in_url = False
-    method = "GET"
-
-    def __init__(self):
-        self.api_wrapper = api_wrapper
-
-    def get_parameter_schema(self):
-        return [
-            Parameter(
-                name="limit", param_type=ParameterType.INTEGER, required=False
-            ),  # Maximum number of items to return. Default 20, min 1, max 50.,
-            Parameter(
-                name="offset", param_type=ParameterType.INTEGER, required=False
-            ),  # The index of the first item to return. Default 0.
-        ]
-
-    def get_output_schema(self):
-        return [
-            OutputParameter(
-                name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Link to the full result.,
-            OutputParameter(
-                name="limit", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Maximum number of items in response.,
-            OutputParameter(
-                name="next", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to next page, or null.,
-            OutputParameter(
-                name="offset", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # The index of the first item in response.,
-            OutputParameter(
-                name="previous", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to previous page, or null.,
-            OutputParameter(
-                name="total", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Total number of saved albums.,
-            OutputParameter(
-                name="items", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Array of saved album objects.
-        ]
-
-    def process(self, input_data: StandardInput) -> StandardOutput:
-        try:
-            out = self.api_wrapper.request(
-                Get_Users_Saved_Albums_GET_mealbums.method,
-                Get_Users_Saved_Albums_GET_mealbums.url,
-                Get_Users_Saved_Albums_GET_mealbums.args_in_url,
-                input_data.validated_data,
-            )
-            return StandardOutput(out, self.get_output_schema())
-        except Exception as e:
-            error_msg = f"Error running function 'Get_Users_Saved_Albums_GET_mealbums': {str(e)}"
-            logging.error(error_msg)
-            raise ValueError(error_msg)
-
-
-class Save_Albums_for_Current_User_PUT_mealbums(BaseFunction):
-    """Saves one or more albums to the current user's library. Requires 'user-library-modify' scope."""
-
-    name = "Save Albums for Current User (PUT /me/albums)"
-    url = "https://api.spotify.com/v1/me/albums"
+    name = "Set Playback Volume"
+    url = "https://api.spotify.com/v1/me/player/volume"
     args_in_url = False
     method = "PUT"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
-                name="ids", param_type=ParameterType.STRING, required=True
-            ),  # Comma-separated list of Spotify album IDs to save. Maximum: 20.
+                name="volume_percent", param_type=ParameterType.INTEGER, required=True
+            ),  # The volume to set, from 0 to 100 inclusive.,
+            Parameter(
+                name="device_id", param_type=ParameterType.STRING, required=False
+            ),  # The ID of the device to target. If not specified, the currently active device is targeted.
         ]
 
     def get_output_schema(self):
@@ -790,21 +565,112 @@ class Save_Albums_for_Current_User_PUT_mealbums(BaseFunction):
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Save_Albums_for_Current_User_PUT_mealbums.method,
-                Save_Albums_for_Current_User_PUT_mealbums.url,
-                Save_Albums_for_Current_User_PUT_mealbums.args_in_url,
+            out = self.api_config.request(
+                Set_Playback_Volume.method,
+                Set_Playback_Volume.url,
+                Set_Playback_Volume.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = f"Error running function 'Save_Albums_for_Current_User_PUT_mealbums': {str(e)}"
+            error_msg = f"Error running function 'Set_Playback_Volume': {str(e)}"
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+
+class Get_Recommended_Tracks(BaseFunction):
+    """Get a list of recommended tracks based on seed artists, genres, and tracks."""
+
+    name = "Get Recommended Tracks"
+    url = "https://api.spotify.com/v1/recommendations"
+    args_in_url = False
+    method = "GET"
+
+    def __init__(self):
+        self.api_config = APIClientConfig()
+
+    def get_parameter_schema(self):
+        return [
+            Parameter(
+                name="seed_artists", param_type=ParameterType.STRING, required=False
+            ),  # A list of Spotify artist IDs. Up to 5 seed artists are allowed.,
+            Parameter(
+                name="seed_genres", param_type=ParameterType.STRING, required=False
+            ),  # A list of Spotify genres. Up to 5 seed genres are allowed.,
+            Parameter(
+                name="seed_tracks", param_type=ParameterType.STRING, required=False
+            ),  # A list of Spotify track IDs. Up to 5 seed tracks are allowed.,
+            Parameter(
+                name="limit", param_type=ParameterType.INTEGER, required=False
+            ),  # The maximum number of recommended tracks to return (default: 20, max: 100).
+        ]
+
+    def get_output_schema(self):
+        return [
+            OutputParameter(
+                name="tracks", param_type=OutputParameterType.OBJECT, is_array=True
+            ),  # A list of recommended tracks.
+        ]
+
+    def process(self, input_data: StandardInput) -> StandardOutput:
+        try:
+            out = self.api_config.request(
+                Get_Recommended_Tracks.method,
+                Get_Recommended_Tracks.url,
+                Get_Recommended_Tracks.args_in_url,
+                input_data.validated_data,
+            )
+            return StandardOutput(out, self.get_output_schema())
+        except Exception as e:
+            error_msg = f"Error running function 'Get_Recommended_Tracks': {str(e)}"
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+
+class Check_Users_Saved_Audiobooks(BaseFunction):
+    """Checks if one or more audiobooks are already saved in the current Spotify user's library. Requires 'user-library-read' scope."""
+
+    name = "Check User's Saved Audiobooks"
+    url = "https://api.spotify.com/v1/me/audiobooks/contains"
+    args_in_url = False
+    method = "GET"
+
+    def __init__(self):
+        self.api_config = APIClientConfig()
+
+    def get_parameter_schema(self):
+        return [
+            Parameter(
+                name="ids", param_type=ParameterType.STRING, required=True
+            ),  # A comma-separated list of Spotify IDs for audiobooks. Maximum: 50 IDs. Example: '18yVqkdbdRvS24c0Ilj2ci,1HGw3J3NxZO1TP1BTtVhpZ'.
+        ]
+
+    def get_output_schema(self):
+        return [
+            OutputParameter(
+                name="result", param_type=OutputParameterType.BOOLEAN, is_array=True
+            ),  # Array of booleans indicating whether each audiobook ID is saved in the user's library.
+        ]
+
+    def process(self, input_data: StandardInput) -> StandardOutput:
+        try:
+            out = self.api_config.request(
+                Check_Users_Saved_Audiobooks.method,
+                Check_Users_Saved_Audiobooks.url,
+                Check_Users_Saved_Audiobooks.args_in_url,
+                input_data.validated_data,
+            )
+            return StandardOutput(out, self.get_output_schema())
+        except Exception as e:
+            error_msg = (
+                f"Error running function 'Check_Users_Saved_Audiobooks': {str(e)}"
+            )
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
 class Remove_Users_Saved_Audiobooks(BaseFunction):
-    """Deletes one or more audiobooks from the Spotify user's library using their Spotify IDs. Requires 'user-library-modify' scope."""
+    """This endpoint deletes one or more audiobooks from the user's library. It requires a comma-separated list of Spotify IDs (max 50)."""
 
     name = "Remove User's Saved Audiobooks"
     url = "https://api.spotify.com/v1/me/audiobooks"
@@ -812,32 +678,32 @@ class Remove_Users_Saved_Audiobooks(BaseFunction):
     method = "DELETE"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="ids", param_type=ParameterType.STRING, required=True
-            ),  # A comma-separated list of Spotify IDs for the audiobooks to remove from the user's library. Maximum: 50 IDs. Example: '18yVqkdbdRvS24c0Ilj2ci,1HGw3J3NxZO1TP1BTtVhpZ'.
+            ),  # A comma-separated list of Spotify IDs (strings). Maximum: 50 IDs. Example: '18yVqkdbdRvS24c0Ilj2ci,1HGw3J3NxZO1TP1BTtVhpZ,7iHfbu1YPACw6oZPAFJtqe',
+            Parameter(
+                name="Authorization scopes",
+                param_type=ParameterType.STRING,
+                required=True,
+            ),  # Requires scope 'user-library-modify' to manage saved content.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
                 name="status_code",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # HTTP response status code indicating the result of the operation.,
-            OutputParameter(
-                name="response_message",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # Message indicating the outcome, e.g., 'Audiobooks have been removed from the library'.
+            ),  # HTTP status code indicating the result of the request: 200, 401, 403, 429
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Remove_Users_Saved_Audiobooks.method,
                 Remove_Users_Saved_Audiobooks.url,
                 Remove_Users_Saved_Audiobooks.args_in_url,
@@ -853,7 +719,7 @@ class Remove_Users_Saved_Audiobooks(BaseFunction):
 
 
 class Get_New_Releases(BaseFunction):
-    """Retrieves a list of new album releases featured in Spotify. Supports optional paging via 'limit' and 'offset' query parameters."""
+    """Retrieves a list of new album releases featured in Spotify, with optional pagination."""
 
     name = "Get New Releases"
     url = "https://api.spotify.com/v1/browse/new-releases"
@@ -861,49 +727,28 @@ class Get_New_Releases(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="limit", param_type=ParameterType.INTEGER, required=False
-            ),  # Maximum number of items to return. Default is 20. Min 1, Max 50. Example: 10.,
+            ),  # Maximum number of items to return. Default: 20. Range: 1-50.,
             Parameter(
                 name="offset", param_type=ParameterType.INTEGER, required=False
-            ),  # The index of the first item to return. Default is 0. Used for paging. Example: 5.
+            ),  # The index of the first item to return. Default: 0.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
-                name="albums", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # A paged set of album objects, containing details about the new releases. The object includes fields like 'href', 'limit', 'next', 'offset', 'previous', 'total', and 'items'.,
-            OutputParameter(
-                name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # A link to the Web API endpoint returning the full result set.,
-            OutputParameter(
-                name="limit", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Maximum number of items returned in this response.,
-            OutputParameter(
-                name="next", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to the next page of items, or null if none.,
-            OutputParameter(
-                name="offset", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # The starting index of the items returned.,
-            OutputParameter(
-                name="previous", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to the previous page of items, or null if none.,
-            OutputParameter(
-                name="total", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Total number of new album releases available.,
-            OutputParameter(
-                name="items", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Array of album objects representing the new releases. Each album object includes fields like 'album_type', 'total_tracks', 'available_markets', 'external_urls', 'href', 'id', 'images', 'name', 'release_date', 'release_date_precision', 'restrictions', 'type', 'uri', and 'artists'.
+                name="albums", param_type=OutputParameterType.OBJECT, is_array=True
+            ),  # A paged set of albums with metadata such as href, limit, next, offset, previous, total, and items.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_New_Releases.method,
                 Get_New_Releases.url,
                 Get_New_Releases.args_in_url,
@@ -917,7 +762,7 @@ class Get_New_Releases(BaseFunction):
 
 
 class Get_Recommendations(BaseFunction):
-    """This endpoint generates track recommendations based on seed entities and optional tuning parameters."""
+    """Returns a set of recommended tracks based on seed entities and tunable track attributes."""
 
     name = "Get Recommendations"
     url = "https://api.spotify.com/v1/recommendations"
@@ -925,188 +770,181 @@ class Get_Recommendations(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="limit", param_type=ParameterType.INTEGER, required=False
-            ),  # The target size of the list of recommended tracks. Default: 20. Range: 1 - 100. Example: 10.,
+            ),  # The target size of the list of recommended tracks. Default is 20. Range: 1 - 100. Example: limit=10.,
             Parameter(
                 name="market", param_type=ParameterType.STRING, required=False
-            ),  # An ISO 3166-1 alpha-2 country code to limit content to a specific market. Example: ES.,
+            ),  # A country code as per ISO 3166-1 alpha-2. Determines the market for content availability. Example: market=ES.,
             Parameter(
                 name="seed_artists", param_type=ParameterType.STRING, required=False
-            ),  # Comma-separated list of Spotify IDs for seed artists (up to 5). Required if seed_genres and seed_tracks are not set. Example: 4NHQUGzhtTLFvgF5SZesLK.,
+            ),  # Comma-separated list of Spotify IDs for seed artists. Up to 5 seed values. Used if seed_genres and seed_tracks are not set. Example: seed_artists=4NHQUGzhtTLFvgF5SZesLK.,
             Parameter(
                 name="seed_genres", param_type=ParameterType.STRING, required=False
-            ),  # Comma-separated list of genres (up to 5). Required if seed_artists and seed_tracks are not set. Example: classical,country.,
+            ),  # Comma-separated list of genres from available genre seeds. Up to 5 seed values. Used if seed_artists and seed_tracks are not set. Example: seed_genres=classical,country.,
             Parameter(
                 name="seed_tracks", param_type=ParameterType.STRING, required=False
-            ),  # Comma-separated list of Spotify IDs for seed tracks (up to 5). Required if seed_artists and seed_genres are not set. Example: 0c6xIDDpzE81m2q797ordA.,
+            ),  # Comma-separated list of Spotify IDs for seed tracks. Up to 5 seed values. Used if seed_artists and seed_genres are not set. Example: seed_tracks=0c6xIDDpzE81m2q797ordA.,
             Parameter(
                 name="min_acousticness", param_type=ParameterType.FLOAT, required=False
-            ),  # Minimum acousticness (0.0 - 1.0). Example: 0.2.,
+            ),  # Minimum acousticness of tracks. Range: 0 - 1.,
             Parameter(
                 name="max_acousticness", param_type=ParameterType.FLOAT, required=False
-            ),  # Maximum acousticness (0.0 - 1.0). Example: 0.8.,
+            ),  # Maximum acousticness of tracks. Range: 0 - 1.,
             Parameter(
                 name="target_acousticness",
                 param_type=ParameterType.FLOAT,
                 required=False,
-            ),  # Target acousticness (0.0 - 1.0). Example: 0.5.,
+            ),  # Target acousticness of tracks. Range: 0 - 1.,
             Parameter(
                 name="min_danceability", param_type=ParameterType.FLOAT, required=False
-            ),  # Minimum danceability (0.0 - 1.0). Example: 0.3.,
+            ),  # Minimum danceability. Range: 0 - 1.,
             Parameter(
                 name="max_danceability", param_type=ParameterType.FLOAT, required=False
-            ),  # Maximum danceability (0.0 - 1.0). Example: 0.9.,
+            ),  # Maximum danceability. Range: 0 - 1.,
             Parameter(
                 name="target_danceability",
                 param_type=ParameterType.FLOAT,
                 required=False,
-            ),  # Target danceability (0.0 - 1.0). Example: 0.6.,
+            ),  # Target danceability. Range: 0 - 1.,
             Parameter(
                 name="min_duration_ms", param_type=ParameterType.INTEGER, required=False
-            ),  # Minimum duration in milliseconds. Example: 180000.,
+            ),  # Minimum duration in milliseconds.,
             Parameter(
                 name="max_duration_ms", param_type=ParameterType.INTEGER, required=False
-            ),  # Maximum duration in milliseconds. Example: 300000.,
+            ),  # Maximum duration in milliseconds.,
             Parameter(
                 name="target_duration_ms",
                 param_type=ParameterType.INTEGER,
                 required=False,
-            ),  # Target duration in milliseconds. Example: 240000.,
+            ),  # Target duration in milliseconds.,
             Parameter(
                 name="min_energy", param_type=ParameterType.FLOAT, required=False
-            ),  # Minimum energy (0.0 - 1.0). Example: 0.4.,
+            ),  # Minimum energy. Range: 0 - 1.,
             Parameter(
                 name="max_energy", param_type=ParameterType.FLOAT, required=False
-            ),  # Maximum energy (0.0 - 1.0). Example: 0.8.,
+            ),  # Maximum energy. Range: 0 - 1.,
             Parameter(
                 name="target_energy", param_type=ParameterType.FLOAT, required=False
-            ),  # Target energy (0.0 - 1.0). Example: 0.6.,
+            ),  # Target energy. Range: 0 - 1.,
             Parameter(
                 name="min_instrumentalness",
                 param_type=ParameterType.FLOAT,
                 required=False,
-            ),  # Minimum instrumentalness (0.0 - 1.0). Example: 0.1.,
+            ),  # Minimum instrumentalness. Range: 0 - 1.,
             Parameter(
                 name="max_instrumentalness",
                 param_type=ParameterType.FLOAT,
                 required=False,
-            ),  # Maximum instrumentalness (0.0 - 1.0). Example: 0.9.,
+            ),  # Maximum instrumentalness. Range: 0 - 1.,
             Parameter(
                 name="target_instrumentalness",
                 param_type=ParameterType.FLOAT,
                 required=False,
-            ),  # Target instrumentalness (0.0 - 1.0). Example: 0.5.,
+            ),  # Target instrumentalness. Range: 0 - 1.,
             Parameter(
                 name="min_key", param_type=ParameterType.INTEGER, required=False
-            ),  # Minimum key (0 - 11). Example: 0.,
+            ),  # Minimum key. Range: 0 - 11.,
             Parameter(
                 name="max_key", param_type=ParameterType.INTEGER, required=False
-            ),  # Maximum key (0 - 11). Example: 5.,
+            ),  # Maximum key. Range: 0 - 11.,
             Parameter(
                 name="target_key", param_type=ParameterType.INTEGER, required=False
-            ),  # Target key (0 - 11). Example: 2.,
+            ),  # Target key. Range: 0 - 11.,
             Parameter(
                 name="min_liveness", param_type=ParameterType.FLOAT, required=False
-            ),  # Minimum liveness (0.0 - 1.0). Example: 0.2.,
+            ),  # Minimum liveness. Range: 0 - 1.,
             Parameter(
                 name="max_liveness", param_type=ParameterType.FLOAT, required=False
-            ),  # Maximum liveness (0.0 - 1.0). Example: 0.8.,
+            ),  # Maximum liveness. Range: 0 - 1.,
             Parameter(
                 name="target_liveness", param_type=ParameterType.FLOAT, required=False
-            ),  # Target liveness (0.0 - 1.0). Example: 0.5.,
+            ),  # Target liveness. Range: 0 - 1.,
             Parameter(
                 name="min_loudness", param_type=ParameterType.FLOAT, required=False
-            ),  # Minimum loudness (0.0 - 1.0). Example: -0.6.,
+            ),  # Minimum loudness in decibels.,
             Parameter(
                 name="max_loudness", param_type=ParameterType.FLOAT, required=False
-            ),  # Maximum loudness (0.0 - 1.0). Example: -0.2.,
+            ),  # Maximum loudness in decibels.,
             Parameter(
                 name="target_loudness", param_type=ParameterType.FLOAT, required=False
-            ),  # Target loudness (0.0 - 1.0). Example: -0.4.,
+            ),  # Target loudness in decibels.,
             Parameter(
                 name="min_mode", param_type=ParameterType.INTEGER, required=False
-            ),  # Minimum mode (0 or 1). Example: 1.,
+            ),  # Minimum mode (0 or 1).,
             Parameter(
                 name="max_mode", param_type=ParameterType.INTEGER, required=False
-            ),  # Maximum mode (0 or 1). Example: 1.,
+            ),  # Maximum mode (0 or 1).,
             Parameter(
                 name="target_mode", param_type=ParameterType.INTEGER, required=False
-            ),  # Target mode (0 or 1). Example: 1.,
+            ),  # Target mode (0 or 1).,
             Parameter(
                 name="min_popularity", param_type=ParameterType.INTEGER, required=False
-            ),  # Minimum popularity (0 - 100). Example: 50.,
+            ),  # Minimum popularity (0-100).,
             Parameter(
                 name="max_popularity", param_type=ParameterType.INTEGER, required=False
-            ),  # Maximum popularity (0 - 100). Example: 80.,
+            ),  # Maximum popularity (0-100).,
             Parameter(
                 name="target_popularity",
                 param_type=ParameterType.INTEGER,
                 required=False,
-            ),  # Target popularity (0 - 100). Example: 60.,
+            ),  # Target popularity (0-100).,
             Parameter(
                 name="min_speechiness", param_type=ParameterType.FLOAT, required=False
-            ),  # Minimum speechiness (0.0 - 1.0). Example: 0.1.,
+            ),  # Minimum speechiness. Range: 0 - 1.,
             Parameter(
                 name="max_speechiness", param_type=ParameterType.FLOAT, required=False
-            ),  # Maximum speechiness (0.0 - 1.0). Example: 0.9.,
+            ),  # Maximum speechiness. Range: 0 - 1.,
             Parameter(
                 name="target_speechiness",
                 param_type=ParameterType.FLOAT,
                 required=False,
-            ),  # Target speechiness (0.0 - 1.0). Example: 0.5.,
+            ),  # Target speechiness. Range: 0 - 1.,
             Parameter(
                 name="min_tempo", param_type=ParameterType.FLOAT, required=False
-            ),  # Minimum tempo in BPM. Example: 100.,
+            ),  # Minimum tempo in BPM.,
             Parameter(
                 name="max_tempo", param_type=ParameterType.FLOAT, required=False
-            ),  # Maximum tempo in BPM. Example: 140.,
+            ),  # Maximum tempo in BPM.,
             Parameter(
                 name="target_tempo", param_type=ParameterType.FLOAT, required=False
-            ),  # Target tempo in BPM. Example: 120.,
+            ),  # Target tempo in BPM.,
             Parameter(
                 name="min_time_signature",
                 param_type=ParameterType.INTEGER,
                 required=False,
-            ),  # Minimum time signature (e.g., 3). Max: 11. Example: 4.,
+            ),  # Minimum time signature (1-11).,
             Parameter(
                 name="max_time_signature",
                 param_type=ParameterType.INTEGER,
                 required=False,
-            ),  # Maximum time signature. Max: 11. Example: 4.,
+            ),  # Maximum time signature (1-11).,
             Parameter(
                 name="target_time_signature",
                 param_type=ParameterType.INTEGER,
                 required=False,
-            ),  # Target time signature. Example: 4.,
+            ),  # Target time signature (1-11).,
             Parameter(
                 name="min_valence", param_type=ParameterType.FLOAT, required=False
-            ),  # Minimum valence (0.0 - 1.0). Example: 0.2.,
+            ),  # Minimum valence. Range: 0 - 1.,
             Parameter(
                 name="max_valence", param_type=ParameterType.FLOAT, required=False
-            ),  # Maximum valence (0.0 - 1.0). Example: 0.8.,
+            ),  # Maximum valence. Range: 0 - 1.,
             Parameter(
                 name="target_valence", param_type=ParameterType.FLOAT, required=False
-            ),  # Target valence (0.0 - 1.0). Example: 0.5.
+            ),  # Target valence. Range: 0 - 1.
         ]
 
     def get_output_schema(self):
-        return [
-            OutputParameter(
-                name="seeds", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # An array of recommendation seed objects.,
-            OutputParameter(
-                name="tracks", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # An array of simplified track objects.
-        ]
+        return []
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_Recommendations.method,
                 Get_Recommendations.url,
                 Get_Recommendations.args_in_url,
@@ -1120,68 +958,29 @@ class Get_Recommendations(BaseFunction):
 
 
 class Display_your_Spotify_profile_data_in_a_web_app(BaseFunction):
-    """Retrieve the current user's profile data."""
+    """Provides a schema to describe user profile data for web app display."""
 
     name = "Display your Spotify profile data in a web app"
-    url = "https://developer.spotify.com/documentation/web-api/reference/get-current-users-profile"
+    url = "https://developer.spotify.com/documentation/web-api/howtos/web-app-profile"
     args_in_url = False
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
-        return []
+        return [
+            Parameter(
+                name="profile", param_type=OutputParameterType.OBJECT, required=True
+            ),  # User profile data with fields: display_name, email, id, uri, href, images, external_urls, followers, product, type, uri.
+        ]
 
     def get_output_schema(self):
-        return [
-            OutputParameter(
-                name="country", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The country of the user.,
-            OutputParameter(
-                name="display_name",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # The display name of the user.,
-            OutputParameter(
-                name="email", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The email of the user.,
-            OutputParameter(
-                name="explicit_content",
-                param_type=OutputParameterType.OBJECT,
-                is_array=False,
-            ),  # Object indicating whether explicit content is filtered.,
-            OutputParameter(
-                name="external_urls",
-                param_type=OutputParameterType.OBJECT,
-                is_array=False,
-            ),  # Object with external URLs.,
-            OutputParameter(
-                name="followers", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # Object containing follower information.,
-            OutputParameter(
-                name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to the Web API endpoint for this user.,
-            OutputParameter(
-                name="id", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The Spotify ID for the user.,
-            OutputParameter(
-                name="images", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Array of profile images.,
-            OutputParameter(
-                name="product", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify product type.,
-            OutputParameter(
-                name="type", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Object type.,
-            OutputParameter(
-                name="uri", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify URI.
-        ]
+        return []
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Display_your_Spotify_profile_data_in_a_web_app.method,
                 Display_your_Spotify_profile_data_in_a_web_app.url,
                 Display_your_Spotify_profile_data_in_a_web_app.args_in_url,
@@ -1195,7 +994,7 @@ class Display_your_Spotify_profile_data_in_a_web_app(BaseFunction):
 
 
 class Check_Users_Saved_Albums(BaseFunction):
-    """Check if one or more albums are saved in the user's library."""
+    """Checks whether one or more albums are already saved in the user's library."""
 
     name = "Check User's Saved Albums"
     url = "https://api.spotify.com/v1/me/albums/contains"
@@ -1203,25 +1002,25 @@ class Check_Users_Saved_Albums(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="ids", param_type=ParameterType.STRING, required=True
-            ),  # Comma-separated list of Spotify IDs for albums (max 20). Example: 382ObEPsp2rxGrnsizN5TX,1A2GTWGtFfWp7KSQTwWOyo.
+            ),  # Comma-separated list of Spotify album IDs. Max 20. Example: ids=382ObEPsp2rxGrnsizN5TX,1A2GTWGtFfWp7KSQTwWOyo,2noRn2Aes5aoNVsU6iWThc.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
-                name="0", param_type=OutputParameterType.BOOLEAN, is_array=True
-            ),  # Boolean indicating whether each album is saved in the user's library.
+                name="array", param_type=OutputParameterType.BOOLEAN, is_array=True
+            ),  # Array of booleans indicating if albums are saved (true) or not (false) in the current user's library. Example: [false,true].
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Check_Users_Saved_Albums.method,
                 Check_Users_Saved_Albums.url,
                 Check_Users_Saved_Albums.args_in_url,
@@ -1235,7 +1034,7 @@ class Check_Users_Saved_Albums(BaseFunction):
 
 
 class Get_Multiple_Shows(BaseFunction):
-    """Retrieve information about multiple shows by their Spotify IDs."""
+    """Retrieve information about multiple shows using their Spotify IDs."""
 
     name = "Get Multiple Shows"
     url = "https://api.spotify.com/v1/shows"
@@ -1243,28 +1042,25 @@ class Get_Multiple_Shows(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="market", param_type=ParameterType.STRING, required=False
-            ),  # An ISO 3166-1 alpha-2 country code. If specified, only content available in that market will be returned. If a user access token is provided, the user's country will take priority. If neither is provided, the content is considered unavailable. Example: 'ES'.,
-            Parameter(
-                name="ids", param_type=ParameterType.STRING, required=True
-            ),  # A comma-separated list of Spotify IDs for the shows. Maximum: 50 IDs. Example: '5CfCWKI5pZ28U0uOzXkDHe,5as3aKmN2k11yfDDDSrvaZ'.
+            ),  # An ISO 3166-1 alpha-2 country code. If specified, only content available in this market will be returned. If a user access token is provided, the user account's country will take priority. Example: 'ES'
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
                 name="shows", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # An array of show objects, each with details about the show including available markets, copyrights, description, images, and more.
+            ),  # An array of show objects with their details.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_Multiple_Shows.method,
                 Get_Multiple_Shows.url,
                 Get_Multiple_Shows.args_in_url,
@@ -1286,7 +1082,7 @@ class Get_Artists_Top_Tracks(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
@@ -1295,7 +1091,7 @@ class Get_Artists_Top_Tracks(BaseFunction):
             ),  # The Spotify ID of the artist. Example: '0TnOYISbd1XYRBk9myaseg'.,
             Parameter(
                 name="market", param_type=ParameterType.STRING, required=False
-            ),  # An ISO 3166-1 alpha-2 country code. If specified, only top tracks available in that market are returned. If a user access token is provided, the user's country takes priority. If neither is provided, content is considered unavailable. Example: 'ES'.
+            ),  # An ISO 3166-1 alpha-2 country code. The top tracks returned will be relevant to this market. If none is provided and the user has a valid access token, the user's country will be used. Example: 'ES'.
         ]
 
     def get_output_schema(self):
@@ -1307,7 +1103,7 @@ class Get_Artists_Top_Tracks(BaseFunction):
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_Artists_Top_Tracks.method,
                 Get_Artists_Top_Tracks.url,
                 Get_Artists_Top_Tracks.args_in_url,
@@ -1321,7 +1117,7 @@ class Get_Artists_Top_Tracks(BaseFunction):
 
 
 class Change_Playlist_Details(BaseFunction):
-    """Update a playlist's name, public/private status, collaborative status, or description."""
+    """Update the name, public/private status, collaborative status, or description of a playlist."""
 
     name = "Change Playlist Details"
     url = "https://api.spotify.com/v1/playlists/{playlist_id}"
@@ -1329,25 +1125,25 @@ class Change_Playlist_Details(BaseFunction):
     method = "PUT"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="playlist_id", param_type=ParameterType.STRING, required=True
-            ),  # The Spotify ID of the playlist. Example: '3cEYpjA9oz9GiPac4AsH4n'.,
+            ),  # The Spotify ID of the playlist to update. Example: '3cEYpjA9oz9GiPac4AsH4n'.,
             Parameter(
                 name="name", param_type=ParameterType.STRING, required=False
             ),  # The new name for the playlist, e.g., 'My New Playlist Title'.,
             Parameter(
                 name="public", param_type=ParameterType.BOOLEAN, required=False
-            ),  # The playlist's public/private status: true=public, false=private, null=not relevant.,
+            ),  # Whether the playlist should be public (true), private (false), or leave unchanged (null).,
             Parameter(
                 name="collaborative", param_type=ParameterType.BOOLEAN, required=False
-            ),  # If true, the playlist will become collaborative, allowing others to modify it. Note: only set to true on non-public playlists.,
+            ),  # Set to true to make the playlist collaborative, allowing others to modify it. Note: Only applicable to non-public playlists.,
             Parameter(
                 name="description", param_type=ParameterType.STRING, required=False
-            ),  # The playlist description as displayed in Spotify clients and the Web API.
+            ),  # A description for the playlist as displayed in Spotify clients and the Web API.
         ]
 
     def get_output_schema(self):
@@ -1355,7 +1151,7 @@ class Change_Playlist_Details(BaseFunction):
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Change_Playlist_Details.method,
                 Change_Playlist_Details.url,
                 Change_Playlist_Details.args_in_url,
@@ -1368,25 +1164,25 @@ class Change_Playlist_Details(BaseFunction):
             raise ValueError(error_msg)
 
 
-class follow_playlist(BaseFunction):
-    """Add the current user as a follower of a playlist. Requires 'playlist-modify-public' or 'playlist-modify-private' scope."""
+class Follow_Playlist(BaseFunction):
+    """Adds the current user as a follower of a playlist."""
 
-    name = "follow_playlist"
+    name = "Follow Playlist"
     url = "https://api.spotify.com/v1/playlists/{playlist_id}/followers"
     args_in_url = True
     method = "PUT"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="playlist_id", param_type=ParameterType.STRING, required=True
-            ),  # Spotify ID of the playlist to follow, e.g., '3cEYpjA9oz9GiPac4AsH4n'.,
+            ),  # The Spotify ID of the playlist. Example: '3cEYpjA9oz9GiPac4AsH4n'.,
             Parameter(
                 name="public", param_type=ParameterType.BOOLEAN, required=False
-            ),  # If true, the playlist will be included in the user's public playlists; defaults to true. If false, the playlist remains private.
+            ),  # Defaults to true. If true, the playlist will be included in the user's public playlists. If false, it remains private.
         ]
 
     def get_output_schema(self):
@@ -1394,229 +1190,138 @@ class follow_playlist(BaseFunction):
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                follow_playlist.method,
-                follow_playlist.url,
-                follow_playlist.args_in_url,
+            out = self.api_config.request(
+                Follow_Playlist.method,
+                Follow_Playlist.url,
+                Follow_Playlist.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = f"Error running function 'follow_playlist': {str(e)}"
+            error_msg = f"Error running function 'Follow_Playlist': {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
-class get_an_artists_albums(BaseFunction):
-    """Get Spotify catalog information about an artist's albums."""
+class Get_Artists_Albums(BaseFunction):
+    """Retrieves Spotify catalog information about an artist's albums."""
 
-    name = "get_an_artists_albums"
+    name = "Get Artist's Albums"
     url = "https://api.spotify.com/v1/artists/{id}/albums"
     args_in_url = True
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="id", param_type=ParameterType.STRING, required=True
-            ),  # Spotify Artist ID, e.g., '0TnOYISbd1XYRBk9myaseg'.,
+            ),  # The Spotify ID of the artist. Example: '0TnOYISbd1XYRBk9myaseg'.,
             Parameter(
                 name="include_groups", param_type=ParameterType.STRING, required=False
-            ),  # Comma-separated list of album types to filter, e.g., 'album,single,appears_on,compilation'.,
+            ),  # Comma-separated list of album types to filter response. Valid values: 'album', 'single', 'appears_on', 'compilation'. For example: 'include_groups=single,appears_on'.,
             Parameter(
                 name="market", param_type=ParameterType.STRING, required=False
-            ),  # ISO 3166-1 alpha-2 country code to filter results by market, e.g., 'ES'.,
+            ),  # ISO 3166-1 alpha-2 country code. Limits the data to the specified market.,
             Parameter(
                 name="limit", param_type=ParameterType.INTEGER, required=False
-            ),  # Maximum number of items to return (1-50), default 20.,
+            ),  # Maximum number of items to return. Default: 20. Range: 1-50.,
             Parameter(
                 name="offset", param_type=ParameterType.INTEGER, required=False
-            ),  # Index of the first item to return, default 0.
+            ),  # Index of the first item to return. Default: 0.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
                 name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Link to full API result.,
+            ),  # Link to the Web API endpoint returning the full result.,
             OutputParameter(
                 name="limit", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Number of items returned.,
+            ),  # Maximum number of items in the response.,
             OutputParameter(
                 name="next", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to next page of results or null.,
+            ),  # URL to the next page of results, or null if none.,
             OutputParameter(
                 name="offset", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Index of the first item returned.,
+            ),  # The offset of the returned items.,
             OutputParameter(
                 name="previous", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to previous page or null.,
+            ),  # URL to the previous page of results, or null if none.,
             OutputParameter(
                 name="total", param_type=OutputParameterType.INTEGER, is_array=False
             ),  # Total number of albums available.,
             OutputParameter(
                 name="items", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # List of album objects, each with properties:,
-            OutputParameter(
-                name="album_type", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Type of album. Allowed: 'album', 'single', 'compilation'.,
-            OutputParameter(
-                name="total_tracks",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Number of tracks in the album.,
-            OutputParameter(
-                name="available_markets",
-                param_type=OutputParameterType.STRING,
-                is_array=True,
-            ),  # Markets where the album is available, e.g., ['CA','BR','IT'].,
-            OutputParameter(
-                name="external_urls",
-                param_type=OutputParameterType.OBJECT,
-                is_array=False,
-            ),  # Known external URLs for this album.,
-            OutputParameter(
-                name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Link to the full album object.,
-            OutputParameter(
-                name="id", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify ID for the album.,
-            OutputParameter(
-                name="images", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Album cover images with properties:,
-            OutputParameter(
-                name="url", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Image URL.,
-            OutputParameter(
-                name="height", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Image height in pixels, nullable.,
-            OutputParameter(
-                name="width", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Image width in pixels, nullable.,
-            OutputParameter(
-                name="name", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Name of the album.,
-            OutputParameter(
-                name="release_date",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Release date of the album, e.g., '1981-12'.,
-            OutputParameter(
-                name="release_date_precision",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Precision of release date. Allowed: 'year', 'month', 'day'.,
-            OutputParameter(
-                name="restrictions",
-                param_type=OutputParameterType.OBJECT,
-                is_array=False,
-            ),  # Content restrictions, if any, with property 'reason' which can be 'market', 'product', or 'explicit'.,
-            OutputParameter(
-                name="type", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Object type, must be 'album'.,
-            OutputParameter(
-                name="uri", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify URI for the album.,
-            OutputParameter(
-                name="artists", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # List of artist objects with properties:,
-            OutputParameter(
-                name="external_urls",
-                param_type=OutputParameterType.OBJECT,
-                is_array=False,
-            ),  # External URLs for the artist.,
-            OutputParameter(
-                name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Link to the artist object.,
-            OutputParameter(
-                name="id", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify ID for the artist.,
-            OutputParameter(
-                name="name", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Artist name.,
-            OutputParameter(
-                name="type", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Object type, 'artist'.,
-            OutputParameter(
-                name="uri", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify URI for the artist.,
-            OutputParameter(
-                name="album_group",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Relationship of the artist to the album, e.g., 'album', 'single', 'compilation', 'appears_on'.
+            ),  # Array of album objects.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                get_an_artists_albums.method,
-                get_an_artists_albums.url,
-                get_an_artists_albums.args_in_url,
+            out = self.api_config.request(
+                Get_Artists_Albums.method,
+                Get_Artists_Albums.url,
+                Get_Artists_Albums.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = f"Error running function 'get_an_artists_albums': {str(e)}"
+            error_msg = f"Error running function 'Get_Artists_Albums': {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
-class remove_albums_user(BaseFunction):
-    """Remove one or more albums from the current user's 'Your Music' library. Requires 'user-library-modify' scope."""
+class Remove_Users_Saved_Albums(BaseFunction):
+    """Removes one or more albums from the current user's 'Your Music' library."""
 
-    name = "remove_albums_user"
+    name = "Remove User's Saved Albums"
     url = "https://api.spotify.com/v1/me/albums"
     args_in_url = False
     method = "DELETE"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="ids", param_type=ParameterType.STRING, required=True
-            ),  # Comma-separated list of Spotify album IDs to remove, e.g., '382ObEPsp2rxGrnsizN5TX,1A2GTWGtFfWp7KSQTwWOyo'.
+            ),  # A comma-separated list of Spotify IDs for the albums. Max: 20 IDs. Example: '382ObEPsp2rxGrnsizN5TX,1A2GTWGtFfWp7KSQTwWOyo'.,
+            Parameter(
+                name="ids_array", param_type=ParameterType.STRING, required=False
+            ),  # A JSON array of Spotify IDs. Max: 50 IDs. Example: ['4iV5W9uYEdYUVa79Axb7Rh', '1301WleyT98MSxVHPZCA6M']. Note: if 'ids' parameter is present, this field is ignored.
         ]
 
     def get_output_schema(self):
-        return [
-            OutputParameter(
-                name="snapshot_id",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Snapshot ID of the user’s 'Your Music' library after removal, e.g., 'abc'.
-        ]
+        return []
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                remove_albums_user.method,
-                remove_albums_user.url,
-                remove_albums_user.args_in_url,
+            out = self.api_config.request(
+                Remove_Users_Saved_Albums.method,
+                Remove_Users_Saved_Albums.url,
+                Remove_Users_Saved_Albums.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = f"Error running function 'remove_albums_user': {str(e)}"
+            error_msg = f"Error running function 'Remove_Users_Saved_Albums': {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
-class migrate_from_implicit_auth_code(BaseFunction):
-    """Guide on migrating from Implicit Grant Flow to Authorization Code with PKCE for Spotify Web API."""
+class Migration_from_Implicit_Grant_to_Authorization_Code_with_PKCE(BaseFunction):
+    """Guide to migrate from Implicit Grant Flow to Authorization Code with PKCE flow, including code generation, handling redirects, and exchanging authorization codes for tokens."""
 
-    name = "migrate_from_implicit_auth_code"
+    name = "Migration from Implicit Grant to Authorization Code with PKCE"
     url = "https://developer.spotify.com/documentation/web-api/tutorials/migration-implicit-auth-code"
     args_in_url = False
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return []
@@ -1626,108 +1331,106 @@ class migrate_from_implicit_auth_code(BaseFunction):
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                migrate_from_implicit_auth_code.method,
-                migrate_from_implicit_auth_code.url,
-                migrate_from_implicit_auth_code.args_in_url,
+            out = self.api_config.request(
+                Migration_from_Implicit_Grant_to_Authorization_Code_with_PKCE.method,
+                Migration_from_Implicit_Grant_to_Authorization_Code_with_PKCE.url,
+                Migration_from_Implicit_Grant_to_Authorization_Code_with_PKCE.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = (
-                f"Error running function 'migrate_from_implicit_auth_code': {str(e)}"
-            )
+            error_msg = f"Error running function 'Migration_from_Implicit_Grant_to_Authorization_Code_with_PKCE': {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
-class Check_if_current_user_follows_Artists_or_Users(BaseFunction):
-    """Checks if the current user follows one or more artists or Spotify users based on the specified IDs."""
+class Check_if_current_user_follows_artists_or_users(BaseFunction):
+    """Checks whether the current user is following one or more artists or Spotify users."""
 
-    name = "Check if current user follows Artists or Users"
+    name = "Check if current user follows artists or users"
     url = "https://api.spotify.com/v1/me/following/contains"
     args_in_url = False
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="type", param_type=ParameterType.STRING, required=True
-            ),  # The ID type: either 'artist' or 'user'.,
+            ),  # The ID type: either 'artist' or 'user'. Allowed values: 'artist', 'user'.,
             Parameter(
                 name="ids", param_type=ParameterType.STRING, required=True
-            ),  # A comma-separated list of the Spotify IDs to check. Maximum of 50 IDs. Example: '2CIMQHirSU0MQqyYHq0eOx,57dN52uHvrHOxijzpIgu3E'.
+            ),  # A comma-separated list of Spotify IDs to check, maximum of 50 IDs. Example: '2CIMQHirSU0MQqyYHq0eOx,57dN52uHvrHOxijzpIgu3E'.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
                 name="response", param_type=OutputParameterType.BOOLEAN, is_array=True
-            ),  # Array of booleans indicating whether the current user follows each ID in the 'ids' list. Example: [false, true].
+            ),  # Array of booleans indicating follow status for each ID. Example: [false,true].
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Check_if_current_user_follows_Artists_or_Users.method,
-                Check_if_current_user_follows_Artists_or_Users.url,
-                Check_if_current_user_follows_Artists_or_Users.args_in_url,
+            out = self.api_config.request(
+                Check_if_current_user_follows_artists_or_users.method,
+                Check_if_current_user_follows_artists_or_users.url,
+                Check_if_current_user_follows_artists_or_users.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = f"Error running function 'Check_if_current_user_follows_Artists_or_Users': {str(e)}"
+            error_msg = f"Error running function 'Check_if_current_user_follows_artists_or_users': {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
-class Skip_to_previous_track_for_users_playback(BaseFunction):
-    """Skips to the previous track in the user's playback. Only works for users with Spotify Premium."""
+class Skip_to_previous_track_in_users_playback(BaseFunction):
+    """Skips to the previous track in the user's playback on a specified device."""
 
-    name = "Skip to previous track for user's playback"
+    name = "Skip to previous track in user's playback"
     url = "https://api.spotify.com/v1/me/player/previous"
     args_in_url = False
     method = "PUT"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="device_id", param_type=ParameterType.STRING, required=False
-            ),  # The ID of the device to control. If not provided, the current active device is used. Example: '0d1841b0976bae2a3a310dd74c0f3df354899bc8'.
+            ),  # The ID of the device to target. If not supplied, the user's currently active device is used. Example: '0d1841b0976bae2a3a310dd74c0f3df354899bc8'.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
-                name="response_code",
+                name="status_code",
                 param_type=OutputParameterType.INTEGER,
                 is_array=False,
-            ),  # HTTP status code indicating success (204) or error (401, 403, 429).
+            ),  # HTTP status codes: 204 (No Content), 401, 403, 429.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Skip_to_previous_track_for_users_playback.method,
-                Skip_to_previous_track_for_users_playback.url,
-                Skip_to_previous_track_for_users_playback.args_in_url,
+            out = self.api_config.request(
+                Skip_to_previous_track_in_users_playback.method,
+                Skip_to_previous_track_in_users_playback.url,
+                Skip_to_previous_track_in_users_playback.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = f"Error running function 'Skip_to_previous_track_for_users_playback': {str(e)}"
+            error_msg = f"Error running function 'Skip_to_previous_track_in_users_playback': {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
 class Transfer_playback_to_a_new_device(BaseFunction):
-    """Transfers playback to the specified device(s). Only one device ID is supported at a time."""
+    """Transfers playback to a new device and optionally begins playback."""
 
     name = "Transfer playback to a new device"
     url = "https://api.spotify.com/v1/me/player"
@@ -1735,27 +1438,30 @@ class Transfer_playback_to_a_new_device(BaseFunction):
     method = "PUT"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="device_ids", param_type=ParameterType.STRING, required=True
-            ),  # A JSON array of device IDs to transfer playback to. Although an array is accepted, only a single device ID is supported currently. Example: '[
+            ),  # An array of device IDs on which playback should be transferred. Although an array is supported, only a single device ID is currently supported. Example: ['74ASZWbe4lXaubB36ztrGX'].,
+            Parameter(
+                name="play", param_type=ParameterType.BOOLEAN, required=False
+            ),  # Ensures playback begins on the new device if true. Default is false or not provided, maintaining current playback state.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
-                name="response_code",
+                name="status_code",
                 param_type=OutputParameterType.INTEGER,
                 is_array=False,
-            ),  # HTTP status code indicating success (204) or error (401, 403, 429).
+            ),  # HTTP status codes: 204 (No Content), 401, 403, 429.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Transfer_playback_to_a_new_device.method,
                 Transfer_playback_to_a_new_device.url,
                 Transfer_playback_to_a_new_device.args_in_url,
@@ -1770,16 +1476,60 @@ class Transfer_playback_to_a_new_device(BaseFunction):
             raise ValueError(error_msg)
 
 
-class Get_a_users_available_devices(BaseFunction):
-    """Retrieves information about the user's available Spotify Connect devices."""
+class Pause_playback_on_users_account(BaseFunction):
+    """Pauses playback on the user's active device."""
 
-    name = "Get a user's available devices"
+    name = "Pause playback on user's account"
+    url = "https://api.spotify.com/v1/me/player/pause"
+    args_in_url = False
+    method = "PUT"
+
+    def __init__(self):
+        self.api_config = APIClientConfig()
+
+    def get_parameter_schema(self):
+        return [
+            Parameter(
+                name="device_id", param_type=ParameterType.STRING, required=False
+            ),  # The ID of the device on which to pause playback. If not supplied, the currently active device is used. Example: '0d1841b0976bae2a3a310dd74c0f3df354899bc8'.
+        ]
+
+    def get_output_schema(self):
+        return [
+            OutputParameter(
+                name="status_code",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # HTTP status codes: 204 (No Content), 401, 403, 429.
+        ]
+
+    def process(self, input_data: StandardInput) -> StandardOutput:
+        try:
+            out = self.api_config.request(
+                Pause_playback_on_users_account.method,
+                Pause_playback_on_users_account.url,
+                Pause_playback_on_users_account.args_in_url,
+                input_data.validated_data,
+            )
+            return StandardOutput(out, self.get_output_schema())
+        except Exception as e:
+            error_msg = (
+                f"Error running function 'Pause_playback_on_users_account': {str(e)}"
+            )
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+
+class Get_a_Users_Available_Devices(BaseFunction):
+    """Retrieve the current user's available Spotify Connect devices. Requires 'user-read-playback-state' scope."""
+
+    name = "Get a User's Available Devices"
     url = "https://api.spotify.com/v1/me/player/devices"
     args_in_url = False
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return []
@@ -1788,60 +1538,28 @@ class Get_a_users_available_devices(BaseFunction):
         return [
             OutputParameter(
                 name="devices", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Array of DeviceObject representing the user's available Spotify Connect devices. Each device object includes the following fields:,
-            OutputParameter(
-                name="id", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The device ID, unique and persistent to some extent. Can be used to identify the device in subsequent requests.,
-            OutputParameter(
-                name="is_active", param_type=OutputParameterType.BOOLEAN, is_array=False
-            ),  # Indicates whether this device is the currently active device.,
-            OutputParameter(
-                name="is_private_session",
-                param_type=OutputParameterType.BOOLEAN,
-                is_array=False,
-            ),  # Indicates whether this device is in a private session.,
-            OutputParameter(
-                name="is_restricted",
-                param_type=OutputParameterType.BOOLEAN,
-                is_array=False,
-            ),  # Indicates whether controlling this device is restricted; if true, no Web API commands will be accepted by this device.,
-            OutputParameter(
-                name="name", param_type=OutputParameterType.STRING, is_array=False
-            ),  # A human-readable name for the device, e.g., 'Kitchen speaker'.,
-            OutputParameter(
-                name="type", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Device type, such as 'computer', 'smartphone', or 'speaker'.,
-            OutputParameter(
-                name="volume_percent",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # The current volume of the device in percentage (0-100). Can be null if not available.,
-            OutputParameter(
-                name="supports_volume",
-                param_type=OutputParameterType.BOOLEAN,
-                is_array=False,
-            ),  # Indicates whether this device supports volume control.
+            ),  # Array of DeviceObject, containing information about each device.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Get_a_users_available_devices.method,
-                Get_a_users_available_devices.url,
-                Get_a_users_available_devices.args_in_url,
+            out = self.api_config.request(
+                Get_a_Users_Available_Devices.method,
+                Get_a_Users_Available_Devices.url,
+                Get_a_Users_Available_Devices.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
             error_msg = (
-                f"Error running function 'Get_a_users_available_devices': {str(e)}"
+                f"Error running function 'Get_a_Users_Available_Devices': {str(e)}"
             )
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
 class Get_Artists_Related_Artists(BaseFunction):
-    """Fetches artists related to the specified artist ID, based on listening history."""
+    """Fetch artists related to the given artist ID. Requires 'artist-read-related-artists' scope."""
 
     name = "Get Artist's Related Artists"
     url = "https://api.spotify.com/v1/artists/{id}/related-artists"
@@ -1849,59 +1567,25 @@ class Get_Artists_Related_Artists(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="id", param_type=ParameterType.STRING, required=True
-            ),  # The Spotify ID of the artist. This is a required parameter and should be provided in the URL path. Example: '0TnOYISbd1XYRBk9myaseg'.
+            ),  # The Spotify ID of the artist.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
                 name="artists", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # A list of artist objects related to the specified artist.,
-            OutputParameter(
-                name="external_urls",
-                param_type=OutputParameterType.OBJECT,
-                is_array=False,
-            ),  # Known external URLs for the artist, including 'spotify' URL.,
-            OutputParameter(
-                name="followers", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # Information about the artist's followers, including total count.,
-            OutputParameter(
-                name="genres", param_type=OutputParameterType.STRING, is_array=True
-            ),  # List of genres associated with the artist.,
-            OutputParameter(
-                name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # A link to the Web API endpoint providing full details of the artist.,
-            OutputParameter(
-                name="id", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The Spotify ID for the artist.,
-            OutputParameter(
-                name="images", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Images of the artist in various sizes.,
-            OutputParameter(
-                name="name", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Name of the artist.,
-            OutputParameter(
-                name="popularity",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Artist's popularity score, from 0 to 100.,
-            OutputParameter(
-                name="type", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Object type, always 'artist'.,
-            OutputParameter(
-                name="uri", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify URI for the artist.
+            ),  # Array of ArtistObject, representing related artists.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_Artists_Related_Artists.method,
                 Get_Artists_Related_Artists.url,
                 Get_Artists_Related_Artists.args_in_url,
@@ -1917,7 +1601,7 @@ class Get_Artists_Related_Artists(BaseFunction):
 
 
 class Get_Several_Tracks_Audio_Features(BaseFunction):
-    """Retrieves audio features for multiple tracks based on their Spotify IDs."""
+    """Retrieve audio features for multiple tracks by their Spotify IDs. Requires 'audio-read' scope."""
 
     name = "Get Several Tracks' Audio Features"
     url = "https://api.spotify.com/v1/audio-features"
@@ -1925,13 +1609,13 @@ class Get_Several_Tracks_Audio_Features(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="ids", param_type=ParameterType.STRING, required=True
-            ),  # Comma-separated list of Spotify track IDs. Up to 100 IDs can be provided. Example: '7ouMYWpwJ422jRcDASZB7P,4VqPOruhp5EdPBeR92t6lQ,2takcwOaAZWiXQijPHIx7B'.
+            ),  # Comma-separated list of Spotify track IDs; maximum 100 IDs.
         ]
 
     def get_output_schema(self):
@@ -1940,78 +1624,12 @@ class Get_Several_Tracks_Audio_Features(BaseFunction):
                 name="audio_features",
                 param_type=OutputParameterType.OBJECT,
                 is_array=True,
-            ),  # An array of AudioFeaturesObject, each containing audio analysis for a track.,
-            OutputParameter(
-                name="acousticness",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Confidence measure from 0.0 to 1.0 of whether the track is acoustic.,
-            OutputParameter(
-                name="analysis_url",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # URL to access the full audio analysis of the track.,
-            OutputParameter(
-                name="danceability",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # How suitable the track is for dancing, 0.0 to 1.0.,
-            OutputParameter(
-                name="duration_ms",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Length of the track in milliseconds.,
-            OutputParameter(
-                name="energy", param_type=OutputParameterType.FLOAT, is_array=False
-            ),  # Perceptual measure of intensity, 0.0 to 1.0.,
-            OutputParameter(
-                name="id", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify ID of the track.,
-            OutputParameter(
-                name="instrumentalness",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Likelihood the track contains no vocals, 0.0 to 1.0.,
-            OutputParameter(
-                name="key", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Key the track is in, with -1 indicating no detection; 0-11 representing pitches.,
-            OutputParameter(
-                name="liveness", param_type=OutputParameterType.FLOAT, is_array=False
-            ),  # Presence of an audience, 0.0 to 1.0.,
-            OutputParameter(
-                name="loudness", param_type=OutputParameterType.FLOAT, is_array=False
-            ),  # Overall loudness in decibels.,
-            OutputParameter(
-                name="mode", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Mode (major or minor), 1 or 0.,
-            OutputParameter(
-                name="speechiness", param_type=OutputParameterType.FLOAT, is_array=False
-            ),  # Presence of spoken words, 0.0 to 1.0.,
-            OutputParameter(
-                name="tempo", param_type=OutputParameterType.FLOAT, is_array=False
-            ),  # Estimated tempo in beats per minute.,
-            OutputParameter(
-                name="time_signature",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Estimated time signature, 3 to 7.,
-            OutputParameter(
-                name="track_href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to the full details of the track.,
-            OutputParameter(
-                name="type", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Object type, always 'audio_features'.,
-            OutputParameter(
-                name="uri", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify URI for the track.,
-            OutputParameter(
-                name="valence", param_type=OutputParameterType.FLOAT, is_array=False
-            ),  # Musical positiveness, 0.0 to 1.0.
+            ),  # Array of AudioFeaturesObject, each representing audio features for a track.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_Several_Tracks_Audio_Features.method,
                 Get_Several_Tracks_Audio_Features.url,
                 Get_Several_Tracks_Audio_Features.args_in_url,
@@ -2026,34 +1644,22 @@ class Get_Several_Tracks_Audio_Features(BaseFunction):
             raise ValueError(error_msg)
 
 
-class Create_Playlist(BaseFunction):
-    """Creates a new playlist for a user with specified details."""
+class Create_a_Playlist_for_a_User(BaseFunction):
+    """Create a new playlist under the specified user. Requires 'playlist-modify-public' or 'playlist-modify-private' scope."""
 
-    name = "Create Playlist"
+    name = "Create a Playlist for a User"
     url = "https://api.spotify.com/v1/users/{user_id}/playlists"
     args_in_url = True
     method = "PUT"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="user_id", param_type=ParameterType.STRING, required=True
-            ),  # The Spotify user ID of the user for whom the playlist is being created. Example: 'smedjan'.,
-            Parameter(
-                name="name", param_type=ParameterType.STRING, required=True
-            ),  # The name for the new playlist, e.g., 'Your Coolest Playlist'.,
-            Parameter(
-                name="public", param_type=ParameterType.BOOLEAN, required=False
-            ),  # Whether the playlist is public. Defaults to true.,
-            Parameter(
-                name="collaborative", param_type=ParameterType.BOOLEAN, required=False
-            ),  # Whether the playlist is collaborative. Defaults to false.,
-            Parameter(
-                name="description", param_type=ParameterType.STRING, required=False
-            ),  # Description of the playlist, visible in Spotify clients.
+            ),  # The Spotify User ID.
         ]
 
     def get_output_schema(self):
@@ -2062,46 +1668,43 @@ class Create_Playlist(BaseFunction):
                 name="collaborative",
                 param_type=OutputParameterType.BOOLEAN,
                 is_array=False,
-            ),  # Indicates if the playlist owner allows others to modify the playlist.,
+            ),  # Indicates if the playlist is collaborative.,
             OutputParameter(
                 name="description",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # The playlist description, might be null if not set.,
+            ),  # The playlist description.,
             OutputParameter(
                 name="external_urls",
                 param_type=OutputParameterType.OBJECT,
                 is_array=False,
-            ),  # External URLs for the playlist, including Spotify URL.,
+            ),  # Known external URLs for this playlist.,
             OutputParameter(
                 name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Link to the Web API endpoint providing full details of the playlist.,
+            ),  # Link to the Web API endpoint for full playlist details.,
             OutputParameter(
                 name="id", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The Spotify ID for the playlist.,
+            ),  # Spotify ID for the new playlist.,
             OutputParameter(
                 name="images", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Array of images associated with the playlist, ordered by size.,
+            ),  # Array of ImageObject for playlist images.,
             OutputParameter(
                 name="name", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Name of the playlist.,
+            ),  # The name of the playlist.,
             OutputParameter(
                 name="owner", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # The user who owns the playlist, with details including external URLs, href, id, images, name, and uri.,
+            ),  # User who owns the playlist.,
             OutputParameter(
                 name="public", param_type=OutputParameterType.BOOLEAN, is_array=False
-            ),  # Whether the playlist is public.,
+            ),  # Indicates if the playlist is public.,
             OutputParameter(
                 name="snapshot_id",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # The version identifier of the playlist.,
+            ),  # Version identifier for the playlist.,
             OutputParameter(
                 name="tracks", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # Object containing reference to tracks, with fields like href, limit, next, offset, previous, total, and items.,
-            OutputParameter(
-                name="type", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Object type, always 'playlist'.,
+            ),  # Tracks object of the playlist.,
             OutputParameter(
                 name="uri", param_type=OutputParameterType.STRING, is_array=False
             ),  # Spotify URI for the playlist.
@@ -2109,29 +1712,31 @@ class Create_Playlist(BaseFunction):
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Create_Playlist.method,
-                Create_Playlist.url,
-                Create_Playlist.args_in_url,
+            out = self.api_config.request(
+                Create_a_Playlist_for_a_User.method,
+                Create_a_Playlist_for_a_User.url,
+                Create_a_Playlist_for_a_User.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = f"Error running function 'Create_Playlist': {str(e)}"
+            error_msg = (
+                f"Error running function 'Create_a_Playlist_for_a_User': {str(e)}"
+            )
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
-class Save_Albums_for_Current_User(BaseFunction):
-    """Endpoint to save one or more albums to the current user's 'Your Music' library."""
+class Get_Current_Users_Saved_Albums(BaseFunction):
+    """Allows the client to save one or more albums to the current user's 'Your Music' library. Requires 'user-library-modify' scope."""
 
-    name = "Save Albums for Current User"
+    name = "Get Current User's Saved Albums"
     url = "https://api.spotify.com/v1/me/albums"
     args_in_url = False
     method = "PUT"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
@@ -2139,44 +1744,46 @@ class Save_Albums_for_Current_User(BaseFunction):
                 name="ids", param_type=ParameterType.STRING, required=True
             ),  # A comma-separated list of Spotify album IDs. Maximum: 20 IDs. Example: '382ObEPsp2rxGrnsizN5TX,1A2GTWGtFfWp7KSQTwWOyo,2noRn2Aes5aoNVsU6iWThc'.,
             Parameter(
-                name="ids_array", param_type=ParameterType.STRING, required=False
-            ),  # A JSON array of Spotify album IDs, e.g. ['4iV5W9uYEdYUVa79Axb7Rh', '1301WleyT98MSxVHPZCA6M']. A maximum of 50 items can be specified; this parameter is ignored if 'ids' in query string.
+                name="ids_array", param_type=OutputParameterType.OBJECT, required=False
+            ),  # A JSON array of Spotify album IDs, e.g., ['4iV5W9uYEdYUVa79Axb7Rh','1301WleyT98MSxVHPZCA6M']. A maximum of 50 IDs can be specified.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
-                name="response", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Empty response body indicates success. Possible response status codes: 200, 401, 403, 429.
+                name="status_code",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # HTTP response status code indicating success or failure.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Save_Albums_for_Current_User.method,
-                Save_Albums_for_Current_User.url,
-                Save_Albums_for_Current_User.args_in_url,
+            out = self.api_config.request(
+                Get_Current_Users_Saved_Albums.method,
+                Get_Current_Users_Saved_Albums.url,
+                Get_Current_Users_Saved_Albums.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
             error_msg = (
-                f"Error running function 'Save_Albums_for_Current_User': {str(e)}"
+                f"Error running function 'Get_Current_Users_Saved_Albums': {str(e)}"
             )
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
-class Get_an_Artist(BaseFunction):
-    """Retrieve Spotify catalog information for a single artist by their unique Spotify ID."""
+class Get_Artist_by_ID(BaseFunction):
+    """Retrieves detailed information about an artist by Spotify ID. Requires 'artist-read' scope."""
 
-    name = "Get an Artist"
+    name = "Get Artist by ID"
     url = "https://api.spotify.com/v1/artists/{id}"
     args_in_url = True
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
@@ -2191,22 +1798,22 @@ class Get_an_Artist(BaseFunction):
                 name="external_urls",
                 param_type=OutputParameterType.OBJECT,
                 is_array=False,
-            ),  # Known external URLs for this artist, e.g., Spotify URL.,
+            ),  # Known external URLs for the artist, including 'spotify' link.,
             OutputParameter(
                 name="followers", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # Information about followers: 'href' (nullable string) always null, 'total' (integer) number of followers.,
+            ),  # Information about the artist's followers, including total count.,
             OutputParameter(
                 name="genres", param_type=OutputParameterType.STRING, is_array=True
-            ),  # List of genres associated with the artist. Example: ['Prog rock','Grunge'].,
+            ),  # List of genres associated with the artist, e.g., ['Prog rock','Grunge'].,
             OutputParameter(
                 name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Link to the Web API endpoint providing full artist details.,
+            ),  # Link to the Web API endpoint providing full details of the artist.,
             OutputParameter(
                 name="id", param_type=OutputParameterType.STRING, is_array=False
             ),  # The Spotify ID of the artist.,
             OutputParameter(
                 name="images", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Array of images of various sizes for the artist.,
+            ),  # Images of the artist in various sizes.,
             OutputParameter(
                 name="name", param_type=OutputParameterType.STRING, is_array=False
             ),  # Name of the artist.,
@@ -2214,46 +1821,46 @@ class Get_an_Artist(BaseFunction):
                 name="popularity",
                 param_type=OutputParameterType.INTEGER,
                 is_array=False,
-            ),  # Artist's popularity score between 0 and 100.,
+            ),  # Popularity score between 0 and 100.,
             OutputParameter(
                 name="type", param_type=OutputParameterType.STRING, is_array=False
             ),  # Object type, always 'artist'.,
             OutputParameter(
                 name="uri", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify URI for the artist.
+            ),  # Spotify URI of the artist.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Get_an_Artist.method,
-                Get_an_Artist.url,
-                Get_an_Artist.args_in_url,
+            out = self.api_config.request(
+                Get_Artist_by_ID.method,
+                Get_Artist_by_ID.url,
+                Get_Artist_by_ID.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = f"Error running function 'Get_an_Artist': {str(e)}"
+            error_msg = f"Error running function 'Get_Artist_by_ID': {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
-class Get_a_Playlist(BaseFunction):
-    """Retrieve the details of a specific playlist by its Spotify ID."""
+class Get_Playlist_details(BaseFunction):
+    """Retrieves detailed information about a specific playlist by its Spotify ID. Requires appropriate scopes."""
 
-    name = "Get a Playlist"
+    name = "Get Playlist details"
     url = "https://api.spotify.com/v1/playlists/{playlist_id}"
     args_in_url = True
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="playlist_id", param_type=ParameterType.STRING, required=True
-            ),  # The Spotify ID of the playlist.
+            ),  # The Spotify ID for the playlist.
         ]
 
     def get_output_schema(self):
@@ -2262,35 +1869,30 @@ class Get_a_Playlist(BaseFunction):
                 name="collaborative",
                 param_type=OutputParameterType.BOOLEAN,
                 is_array=False,
-            ),  # If the playlist is collaborative.,
+            ),  # Whether the playlist is collaborative.,
             OutputParameter(
                 name="description",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
             ),  # The playlist description.,
             OutputParameter(
-                name="external_urls",
-                param_type=OutputParameterType.OBJECT,
-                is_array=False,
-            ),  # External URLs object, including Spotify link.,
-            OutputParameter(
                 name="followers", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # Followers information.,
+            ),  # Information about the followers of the playlist.,
             OutputParameter(
                 name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Link to the Web API endpoint providing full playlist details.,
+            ),  # Link to the Web API endpoint for the playlist.,
             OutputParameter(
                 name="id", param_type=OutputParameterType.STRING, is_array=False
             ),  # The Spotify ID of the playlist.,
             OutputParameter(
                 name="images", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Array of images representing the playlist.,
+            ),  # Array of images associated with the playlist.,
             OutputParameter(
                 name="name", param_type=OutputParameterType.STRING, is_array=False
             ),  # Name of the playlist.,
             OutputParameter(
                 name="owner", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # Object containing owner information.,
+            ),  # User who owns the playlist.,
             OutputParameter(
                 name="public", param_type=OutputParameterType.BOOLEAN, is_array=False
             ),  # Whether the playlist is public.,
@@ -2298,35 +1900,35 @@ class Get_a_Playlist(BaseFunction):
                 name="snapshot_id",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # Snapshot ID for version control.,
+            ),  # Snapshot ID of the playlist for version control.,
             OutputParameter(
                 name="tracks", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # Object containing playlist tracks.,
+            ),  # Tracks contained in the playlist.,
             OutputParameter(
                 name="type", param_type=OutputParameterType.STRING, is_array=False
             ),  # Object type, always 'playlist'.,
             OutputParameter(
                 name="uri", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify URI for the playlist.
+            ),  # Spotify URI of the playlist.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Get_a_Playlist.method,
-                Get_a_Playlist.url,
-                Get_a_Playlist.args_in_url,
+            out = self.api_config.request(
+                Get_Playlist_details.method,
+                Get_Playlist_details.url,
+                Get_Playlist_details.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = f"Error running function 'Get_a_Playlist': {str(e)}"
+            error_msg = f"Error running function 'Get_Playlist_details': {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
 class Set_Repeat_Mode_on_Users_Playback(BaseFunction):
-    """Set the repeat mode for the user's playback. Requires 'user-modify-playback-state' scope. Possible 'state' values: 'track', 'context', 'off'."""
+    """Sets the repeat mode for the user's playback. Note: This API requires the 'user-modify-playback-state' scope. It only works for users with Spotify Premium. The order of execution is not guaranteed when used with other Player API endpoints."""
 
     name = "Set Repeat Mode on User's Playback"
     url = "https://api.spotify.com/v1/me/player/repeat"
@@ -2334,16 +1936,16 @@ class Set_Repeat_Mode_on_Users_Playback(BaseFunction):
     method = "PUT"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="state", param_type=ParameterType.STRING, required=True
-            ),  # Required. The string indicating the repeat mode. Allowed values: 'track' to repeat the current track, 'context' to repeat the current context (playlist or album), or 'off' to turn off repeat.,
+            ),  # The repeat mode. Must be one of: 'track', 'context', or 'off'. 'track' will repeat the current track, 'context' will repeat the current context, and 'off' will turn repeat off.,
             Parameter(
                 name="device_id", param_type=ParameterType.STRING, required=False
-            ),  # Optional. The ID of the device this command is targeting. If not supplied, the currently active device is targeted.
+            ),  # The ID of the device this command is targeting. If not provided, the user's currently active device will be targeted. Example: '0d1841b0976bae2a3a310dd74c0f3df354899bc8'.
         ]
 
     def get_output_schema(self):
@@ -2351,7 +1953,7 @@ class Set_Repeat_Mode_on_Users_Playback(BaseFunction):
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Set_Repeat_Mode_on_Users_Playback.method,
                 Set_Repeat_Mode_on_Users_Playback.url,
                 Set_Repeat_Mode_on_Users_Playback.args_in_url,
@@ -2366,16 +1968,16 @@ class Set_Repeat_Mode_on_Users_Playback(BaseFunction):
             raise ValueError(error_msg)
 
 
-class Get_the_Users_Playback_Queue(BaseFunction):
-    """Retrieve the current queue of tracks and episodes for the user. Requires 'user-read-playback-state' scope. The response includes 'currently_playing' item and 'queue' array with upcoming items."""
+class Get_the_Users_Queue(BaseFunction):
+    """Retrieves the list of objects that make up the user's playback queue. This API requires the 'user-read-playback-state' scope. It only works for users with Spotify Premium. The response includes a 'currently_playing' object (which can be null) and a 'queue' array containing track or episode objects."""
 
-    name = "Get the User's Playback Queue"
+    name = "Get the User's Queue"
     url = "https://api.spotify.com/v1/me/player/queue"
     args_in_url = False
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return []
@@ -2385,23 +1987,21 @@ class Get_the_Users_Playback_Queue(BaseFunction):
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Get_the_Users_Playback_Queue.method,
-                Get_the_Users_Playback_Queue.url,
-                Get_the_Users_Playback_Queue.args_in_url,
+            out = self.api_config.request(
+                Get_the_Users_Queue.method,
+                Get_the_Users_Queue.url,
+                Get_the_Users_Queue.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = (
-                f"Error running function 'Get_the_Users_Playback_Queue': {str(e)}"
-            )
+            error_msg = f"Error running function 'Get_the_Users_Queue': {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
 class Get_Available_Markets(BaseFunction):
-    """Retrieve the list of markets (countries) where Spotify is available. Authentication with OAuth 2.0 required."""
+    """Returns a list of countries/markets where Spotify is available. This endpoint requires OAuth 2.0 authentication."""
 
     name = "Get Available Markets"
     url = "https://api.spotify.com/v1/markets"
@@ -2409,7 +2009,7 @@ class Get_Available_Markets(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return []
@@ -2418,12 +2018,12 @@ class Get_Available_Markets(BaseFunction):
         return [
             OutputParameter(
                 name="markets", param_type=OutputParameterType.STRING, is_array=True
-            ),  # An array of country codes (ISO 3166-1 alpha-2) representing the markets where Spotify is available.
+            ),  # An array of country codes (ISO 3166-1 alpha-2) where Spotify is available. Example: ['CA', 'BR', 'IT'].
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_Available_Markets.method,
                 Get_Available_Markets.url,
                 Get_Available_Markets.args_in_url,
@@ -2436,95 +2036,8 @@ class Get_Available_Markets(BaseFunction):
             raise ValueError(error_msg)
 
 
-class Track_Relinking__Get_a_Track_with_market(BaseFunction):
-    """Retrieves information about a specific track, attempting relinking based on the market if necessary."""
-
-    name = "Track Relinking - Get a Track (with market)"
-    url = "https://api.spotify.com/v1/tracks/{id}"
-    args_in_url = True
-    method = "GET"
-
-    def __init__(self):
-        self.api_wrapper = api_wrapper
-
-    def get_parameter_schema(self):
-        return [
-            Parameter(
-                name="id", param_type=ParameterType.STRING, required=True
-            ),  # The Spotify ID of the track.,
-            Parameter(
-                name="market", param_type=ParameterType.STRING, required=False
-            ),  # A country code (ISO 3166-1 alpha-2). If specified, the API attempts to return the track in the specified market, relinking if necessary.
-        ]
-
-    def get_output_schema(self):
-        return [
-            OutputParameter(
-                name="available_markets",
-                param_type=OutputParameterType.STRING,
-                is_array=True,
-            ),  # List of markets where the track is available. (Note: this property is replaced by 'is_playable' when 'market' is used).,
-            OutputParameter(
-                name="disc_number",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # The disc number (usually 1 unless the album has multiple discs).,
-            OutputParameter(
-                name="duration_ms",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # The length of the track in milliseconds.,
-            OutputParameter(
-                name="explicit", param_type=OutputParameterType.BOOLEAN, is_array=False
-            ),  # Whether the track has explicit lyrics.,
-            OutputParameter(
-                name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # A link to the Web API endpoint providing full details of the track.,
-            OutputParameter(
-                name="id", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The Spotify ID for the track.,
-            OutputParameter(
-                name="is_playable",
-                param_type=OutputParameterType.BOOLEAN,
-                is_array=False,
-            ),  # Indicates if the track can be played in the market.,
-            OutputParameter(
-                name="linked_from",
-                param_type=OutputParameterType.OBJECT,
-                is_array=False,
-            ),  # Contains information about the original track if relinked, including 'external_urls', 'href', 'id', 'type', and 'uri'.,
-            OutputParameter(
-                name="name", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The name of the track.,
-            OutputParameter(
-                name="preview_url",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # A URL to a 30 second preview of the track.,
-            OutputParameter(
-                name="restrictions",
-                param_type=OutputParameterType.OBJECT,
-                is_array=False,
-            ),  # Restrictions if the track is not available, including 'reason' (e.g., 'market').},{
-        ]
-
-    def process(self, input_data: StandardInput) -> StandardOutput:
-        try:
-            out = self.api_wrapper.request(
-                Track_Relinking__Get_a_Track_with_market.method,
-                Track_Relinking__Get_a_Track_with_market.url,
-                Track_Relinking__Get_a_Track_with_market.args_in_url,
-                input_data.validated_data,
-            )
-            return StandardOutput(out, self.get_output_schema())
-        except Exception as e:
-            error_msg = f"Error running function 'Track_Relinking__Get_a_Track_with_market': {str(e)}"
-            logging.error(error_msg)
-            raise ValueError(error_msg)
-
-
 class Get_a_Category(BaseFunction):
-    """Retrieves a single Spotify category used for tagging items."""
+    """Retrieve detailed information about a specific Spotify category by its ID."""
 
     name = "Get a Category"
     url = "https://api.spotify.com/v1/browse/categories/{category_id}"
@@ -2532,16 +2045,16 @@ class Get_a_Category(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="category_id", param_type=ParameterType.STRING, required=True
-            ),  # The Spotify category ID, e.g., 'dinner'.,
+            ),  # The Spotify category ID for the category. Example: 'dinner'.,
             Parameter(
                 name="locale", param_type=ParameterType.STRING, required=False
-            ),  # Language and country code (ISO 639-1 and ISO 3166-1 alpha-2), e.g., 'es_MX'. If not provided, defaults to American English.
+            ),  # The desired language, consisting of an ISO 639-1 language code and an ISO 3166-1 alpha-2 country code, joined by an underscore. For example: 'sv_SE'. Provide this parameter to get category strings in a particular language. If not supplied or unavailable, defaults to English.
         ]
 
     def get_output_schema(self):
@@ -2551,7 +2064,16 @@ class Get_a_Category(BaseFunction):
             ),  # A link to the Web API endpoint returning full details of the category.,
             OutputParameter(
                 name="icons", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Array of image objects representing the category icon in various sizes.,
+            ),  # The category icon in various sizes.,
+            OutputParameter(
+                name="url", param_type=OutputParameterType.STRING, is_array=False
+            ),  # The source URL of the image.,
+            OutputParameter(
+                name="height", param_type=OutputParameterType.INTEGER, is_array=False
+            ),  # The image height in pixels. Nullable.,
+            OutputParameter(
+                name="width", param_type=OutputParameterType.INTEGER, is_array=False
+            ),  # The image width in pixels. Nullable.,
             OutputParameter(
                 name="id", param_type=OutputParameterType.STRING, is_array=False
             ),  # The Spotify category ID.,
@@ -2562,7 +2084,7 @@ class Get_a_Category(BaseFunction):
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_a_Category.method,
                 Get_a_Category.url,
                 Get_a_Category.args_in_url,
@@ -2576,7 +2098,7 @@ class Get_a_Category(BaseFunction):
 
 
 class Get_Show_Episodes(BaseFunction):
-    """Retrieves a list of episodes for a specific show, with optional pagination and market filtering."""
+    """Retrieve a list of episodes for a show, with optional pagination."""
 
     name = "Get Show Episodes"
     url = "https://api.spotify.com/v1/shows/{id}/episodes"
@@ -2584,52 +2106,52 @@ class Get_Show_Episodes(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="id", param_type=ParameterType.STRING, required=True
-            ),  # The Spotify ID of the show.,
+            ),  # The Spotify ID for the show. Example: '38bS44xjbVVZ3No3ByF1dJ'.,
             Parameter(
                 name="market", param_type=ParameterType.STRING, required=False
-            ),  # A country code (ISO 3166-1 alpha-2). If provided, only episodes available in this market are returned. If not, the user's country is used.,
+            ),  # An ISO 3166-1 alpha-2 country code to specify the market. If a user access token is provided, the user's country will take priority. If neither the market nor user country are provided, content is considered unavailable.,
             Parameter(
                 name="limit", param_type=ParameterType.INTEGER, required=False
-            ),  # The maximum number of episodes to return. Default: 20. Min: 1. Max: 50.,
+            ),  # Maximum number of items to return. Default: 20. Range: 1-50.,
             Parameter(
                 name="offset", param_type=ParameterType.INTEGER, required=False
-            ),  # The index of the first episode to return. Default: 0.
+            ),  # Index of the first item to return. Default: 0.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
                 name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # A link to the full result of the request.,
+            ),  # Link to the full result of the request.,
             OutputParameter(
                 name="limit", param_type=OutputParameterType.INTEGER, is_array=False
             ),  # Maximum number of items in the response.,
             OutputParameter(
                 name="next", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to the next page of episodes, or null if none.,
+            ),  # URL to the next page of items. Null if none.,
             OutputParameter(
                 name="offset", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # The offset of the items returned.,
+            ),  # The offset of the returned items.,
             OutputParameter(
                 name="previous", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to the previous page of episodes, or null if none.,
+            ),  # URL to the previous page of items. Null if none.,
             OutputParameter(
                 name="total", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Total number of episodes available.,
+            ),  # Total number of items available.,
             OutputParameter(
                 name="items", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Array of episode objects, including details like 'audio_preview_url', 'description', 'html_description', 'duration_ms', 'explicit', 'external_urls', 'href', 'id', 'images', 'is_externally_hosted', 'is_playable', 'language(s)', 'name', 'release_date', 'release_date_precision', 'resume_point', 'type', 'uri', and 'restrictions'.
+            ),  # Array of episode objects.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_Show_Episodes.method,
                 Get_Show_Episodes.url,
                 Get_Show_Episodes.args_in_url,
@@ -2642,168 +2164,464 @@ class Get_Show_Episodes(BaseFunction):
             raise ValueError(error_msg)
 
 
-class Get_the_users_currently_playing_track(BaseFunction):
-    """Retrieves information about the user's currently playing track or episode."""
+class Seek_to_Position_in_Currently_Playing_Track(BaseFunction):
+    """Seek to a position in the currently playing track for a user who has Spotify Premium."""
 
-    name = "Get the user's currently playing track"
+    name = "Seek to Position in Currently Playing Track"
+    url = "https://api.spotify.com/v1/me/player/seek?position_ms={position_ms}&device_id={device_id}"
+    args_in_url = True
+    method = "PUT"
+
+    def __init__(self):
+        self.api_config = APIClientConfig()
+
+    def get_parameter_schema(self):
+        return [
+            Parameter(
+                name="position_ms", param_type=ParameterType.INTEGER, required=True
+            ),  # The position in milliseconds to seek to. Must be positive. If greater than track length, plays next track.,
+            Parameter(
+                name="device_id", param_type=ParameterType.STRING, required=False
+            ),  # Target device ID. If not supplied, the user's currently active device is targeted.
+        ]
+
+    def get_output_schema(self):
+        return [
+            OutputParameter(
+                name="response_code",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # HTTP response code indicating success or error.
+        ]
+
+    def process(self, input_data: StandardInput) -> StandardOutput:
+        try:
+            out = self.api_config.request(
+                Seek_to_Position_in_Currently_Playing_Track.method,
+                Seek_to_Position_in_Currently_Playing_Track.url,
+                Seek_to_Position_in_Currently_Playing_Track.args_in_url,
+                input_data.validated_data,
+            )
+            return StandardOutput(out, self.get_output_schema())
+        except Exception as e:
+            error_msg = f"Error running function 'Seek_to_Position_in_Currently_Playing_Track': {str(e)}"
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+
+class Get_the_Users_Currently_Playing_Track(BaseFunction):
+    """Retrieve the current playback state of the user."""
+
+    name = "Get the Users' Currently Playing Track"
     url = "https://api.spotify.com/v1/me/player/currently-playing"
     args_in_url = False
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="market", param_type=ParameterType.STRING, required=False
-            ),  # An ISO 3166-1 alpha-2 country code to restrict the content to a specific market. If omitted, the user's country setting will take priority. Example: 'ES'.,
+            ),  # An ISO 3166-1 alpha-2 country code. If specified, only content available in this market will be returned. If omitted, the user's country from account settings takes precedence. Example: 'ES'.,
             Parameter(
                 name="additional_types", param_type=ParameterType.STRING, required=False
-            ),  # A comma-separated list of item types supported besides 'track'. Valid types are: 'track' and 'episode'. This parameter affects the returned item types.
+            ),  # A comma-separated list of item types supported besides 'track'. Valid values: 'track', 'episode'. Note: this parameter may be deprecated in future.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
                 name="device", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # Information about the device currently active for playback.,
+            ),  # The device currently active.,
+            OutputParameter(
+                name="device.id", param_type=OutputParameterType.STRING, is_array=False
+            ),  # The device ID. Nullable, unique, but not guaranteed. Cache should be refreshed periodically.,
+            OutputParameter(
+                name="device.is_active",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # True if this device is the current active device.,
+            OutputParameter(
+                name="device.is_private_session",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # True if the device is in a private session.,
+            OutputParameter(
+                name="device.is_restricted",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # True if control of this device is restricted; no Web API commands will be accepted.,
+            OutputParameter(
+                name="device.name",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Human-readable device name, configurable by user or default.,
+            OutputParameter(
+                name="device.type",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Device type, e.g., 'computer', 'smartphone', 'speaker'.,
+            OutputParameter(
+                name="device.volume_percent",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Current volume in percent (0-100). Nullable.,
+            OutputParameter(
+                name="device.supports_volume",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Indicates if this device can be used to set volume.,
             OutputParameter(
                 name="repeat_state",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # The current repeat mode. Possible values: 'off', 'track', 'context'.,
+            ),  # Playback repeat state. Allowed values: 'off', 'track', 'context'.,
             OutputParameter(
                 name="shuffle_state",
                 param_type=OutputParameterType.BOOLEAN,
                 is_array=False,
-            ),  # Whether shuffle mode is enabled.,
+            ),  # True if shuffle is enabled.,
             OutputParameter(
                 name="context", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # The context object for playback, such as playlist or album.,
+            ),  # The context in which playback is occurring.,
+            OutputParameter(
+                name="context.type",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Type of context, e.g., 'artist', 'playlist', 'album', 'show'.,
+            OutputParameter(
+                name="context.href",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # A link to the Web API endpoint providing details of the context.,
+            OutputParameter(
+                name="context.external_urls.spotify",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Spotify URL for the context.,
+            OutputParameter(
+                name="context.uri",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Spotify URI for the context.,
             OutputParameter(
                 name="timestamp", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Unix timestamp indicating when the playback state was last changed.,
+            ),  # Unix Millisecond timestamp when playback status was last changed.,
             OutputParameter(
                 name="progress_ms",
                 param_type=OutputParameterType.INTEGER,
                 is_array=False,
-            ),  # Progress into the current track or episode in milliseconds. Can be null.,
+            ),  # Progress into the currently playing track or episode in milliseconds. Nullable.,
             OutputParameter(
                 name="is_playing",
                 param_type=OutputParameterType.BOOLEAN,
                 is_array=False,
-            ),  # Indicates if something is currently playing.,
+            ),  # True if something is currently playing.,
             OutputParameter(
                 name="item", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # The currently playing track or episode, or null if nothing is playing.,
+            ),  # The currently playing track or episode. Can be null.,
+            OutputParameter(
+                name="item.album", param_type=OutputParameterType.OBJECT, is_array=False
+            ),  # Album on which the track appears.,
+            OutputParameter(
+                name="item.album.album_type",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Type of album. Allowed: 'album', 'single', 'chapter', 'compilation'.,
+            OutputParameter(
+                name="item.album.total_tracks",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Number of tracks in the album.,
+            OutputParameter(
+                name="item.album.available_markets",
+                param_type=OutputParameterType.STRING,
+                is_array=True,
+            ),  # Markets where the album/track is available. ISO 3166-1 alpha-2 codes.,
+            OutputParameter(
+                name="item.album.external_urls.spotify",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Spotify URL for the album.,
+            OutputParameter(
+                name="item.album.href",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # API endpoint for full album details.,
+            OutputParameter(
+                name="item.album.id",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Spotify ID for the album.,
+            OutputParameter(
+                name="item.album.images",
+                param_type=OutputParameterType.OBJECT,
+                is_array=True,
+            ),  # Cover art images.,
+            OutputParameter(
+                name="item.album.images.url",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Source URL of the image.,
+            OutputParameter(
+                name="item.album.images.height",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Image height in pixels. Nullable.,
+            OutputParameter(
+                name="item.album.images.width",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Image width in pixels. Nullable.,
+            OutputParameter(
+                name="item.album.name",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Album name.,
+            OutputParameter(
+                name="item.album.release_date",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # First release date of the album. Format varies, e.g., '1981-12'.,
+            OutputParameter(
+                name="item.album.release_date_precision",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Precision of release date. Allowed: 'year', 'month', 'day'.,
+            OutputParameter(
+                name="item.album.restrictions",
+                param_type=OutputParameterType.OBJECT,
+                is_array=False,
+            ),  # Content restrictions, if any.,
+            OutputParameter(
+                name="item.album.restrictions.reason",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Reason for restriction. Allowed: 'market', 'product', 'explicit'.,
+            OutputParameter(
+                name="item.album.type",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Object type, e.g., 'album'.,
+            OutputParameter(
+                name="item.album.uri",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Spotify URI for the album.,
+            OutputParameter(
+                name="item.artists",
+                param_type=OutputParameterType.OBJECT,
+                is_array=True,
+            ),  # Artists of the track or album.,
+            OutputParameter(
+                name="item.artists.external_urls.spotify",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Spotify URL for the artist.,
+            OutputParameter(
+                name="item.artists.href",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # API endpoint for artist details.,
+            OutputParameter(
+                name="item.artists.id",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Spotify ID for the artist.,
+            OutputParameter(
+                name="item.artists.name",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Artist name.,
+            OutputParameter(
+                name="item.artists.type",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Object type, e.g., 'artist'.,
+            OutputParameter(
+                name="item.artists.uri",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Spotify URI for the artist.,
+            OutputParameter(
+                name="item.available_markets",
+                param_type=OutputParameterType.STRING,
+                is_array=True,
+            ),  # Markets where the track is available. ISO 3166-1 alpha-2.,
+            OutputParameter(
+                name="item.disc_number",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Disc number, usually 1 unless multi-disc album.,
+            OutputParameter(
+                name="item.duration_ms",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Track length in milliseconds.,
+            OutputParameter(
+                name="item.explicit",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # True if explicit lyrics.,
+            OutputParameter(
+                name="item.external_ids",
+                param_type=OutputParameterType.OBJECT,
+                is_array=False,
+            ),  # External IDs for the track.,
+            OutputParameter(
+                name="item.external_ids.isrc",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # International Standard Recording Code.,
+            OutputParameter(
+                name="item.external_ids.ean",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # International Article Number.,
+            OutputParameter(
+                name="item.external_ids.upc",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Universal Product Code.,
+            OutputParameter(
+                name="item.external_urls.spotify",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Spotify URL for the track.,
+            OutputParameter(
+                name="item.href", param_type=OutputParameterType.STRING, is_array=False
+            ),  # API endpoint for full track details.,
+            OutputParameter(
+                name="item.id", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Spotify ID for the track.,
+            OutputParameter(
+                name="item.is_playable",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # True if the track is playable in current market.,
+            OutputParameter(
+                name="item.linked_from",
+                param_type=OutputParameterType.OBJECT,
+                is_array=False,
+            ),  # Original track info if relinked.,
+            OutputParameter(
+                name="item.restrictions",
+                param_type=OutputParameterType.OBJECT,
+                is_array=False,
+            ),  # Content restrictions.,
+            OutputParameter(
+                name="item.restrictions.reason",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Restriction reason.,
+            OutputParameter(
+                name="item.name", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Track name.,
+            OutputParameter(
+                name="item.popularity",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Popularity score (0-100).,
+            OutputParameter(
+                name="item.preview_url",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # URL to 30s preview, nullable.,
+            OutputParameter(
+                name="item.track_number",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Track number in album/disc.,
+            OutputParameter(
+                name="item.type", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Object type, e.g., 'track'.,
+            OutputParameter(
+                name="item.uri", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Spotify URI for the track.,
+            OutputParameter(
+                name="item.is_local",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # True if local file.,
             OutputParameter(
                 name="currently_playing_type",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # Object type of the currently playing item. Possible values: 'track', 'episode', 'ad', 'unknown'.,
+            ),  # Type of the currently playing item. Allowed: 'track', 'episode', 'ad', 'unknown'.,
             OutputParameter(
                 name="actions", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # Available playback actions within the current context.
-        ]
-
-    def process(self, input_data: StandardInput) -> StandardOutput:
-        try:
-            out = self.api_wrapper.request(
-                Get_the_users_currently_playing_track.method,
-                Get_the_users_currently_playing_track.url,
-                Get_the_users_currently_playing_track.args_in_url,
-                input_data.validated_data,
-            )
-            return StandardOutput(out, self.get_output_schema())
-        except Exception as e:
-            error_msg = f"Error running function 'Get_the_users_currently_playing_track': {str(e)}"
-            logging.error(error_msg)
-            raise ValueError(error_msg)
-
-
-class Save_audiobooks_for_the_current_user(BaseFunction):
-    """Saves one or more audiobooks to the current Spotify user's library."""
-
-    name = "Save audiobooks for the current user"
-    url = "https://api.spotify.com/v1/me/audiobooks"
-    args_in_url = False
-    method = "PUT"
-
-    def __init__(self):
-        self.api_wrapper = api_wrapper
-
-    def get_parameter_schema(self):
-        return [
-            Parameter(
-                name="ids", param_type=ParameterType.STRING, required=True
-            ),  # A comma-separated list of Spotify IDs for audiobooks to save. Maximum: 50 IDs. Example: '18yVqkdbdRvS24c0Ilj2ci,1HGw3J3NxZO1TP1BTtVhpZ'
-        ]
-
-    def get_output_schema(self):
-        return [
+            ),  # Available playback actions.,
             OutputParameter(
-                name="", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Empty response indicating success.
-        ]
-
-    def process(self, input_data: StandardInput) -> StandardOutput:
-        try:
-            out = self.api_wrapper.request(
-                Save_audiobooks_for_the_current_user.method,
-                Save_audiobooks_for_the_current_user.url,
-                Save_audiobooks_for_the_current_user.args_in_url,
-                input_data.validated_data,
-            )
-            return StandardOutput(out, self.get_output_schema())
-        except Exception as e:
-            error_msg = f"Error running function 'Save_audiobooks_for_the_current_user': {str(e)}"
-            logging.error(error_msg)
-            raise ValueError(error_msg)
-
-
-class Check_if_user_has_saved_specific_tracks(BaseFunction):
-    """Checks if one or more tracks are already saved in the current user's 'Your Music' library."""
-
-    name = "Check if user has saved specific tracks"
-    url = "https://api.spotify.com/v1/me/tracks/contains"
-    args_in_url = False
-    method = "GET"
-
-    def __init__(self):
-        self.api_wrapper = api_wrapper
-
-    def get_parameter_schema(self):
-        return [
-            Parameter(
-                name="ids", param_type=ParameterType.STRING, required=True
-            ),  # A comma-separated list of Spotify IDs for tracks to check. Maximum: 50 IDs. Example: '7ouMYWpwJ422jRcDASZB7P,4VqPOruhp5EdPBeR92t6lQ'
-        ]
-
-    def get_output_schema(self):
-        return [
+                name="actions.interrupting_playback",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Can playback be interrupted?,
             OutputParameter(
-                name="", param_type=OutputParameterType.BOOLEAN, is_array=True
-            ),  # An array of booleans indicating whether each track is saved (true) or not (false).
+                name="actions.pausing",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Can playback be paused?,
+            OutputParameter(
+                name="actions.resuming",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Can playback be resumed?,
+            OutputParameter(
+                name="actions.seeking",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Can seek operations be performed.,
+            OutputParameter(
+                name="actions.skipping_next",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Can skip to next.,
+            OutputParameter(
+                name="actions.skipping_prev",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Can skip to previous.,
+            OutputParameter(
+                name="actions.toggling_repeat_context",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Can toggle repeat context.,
+            OutputParameter(
+                name="actions.toggling_shuffle",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Can toggle shuffle.,
+            OutputParameter(
+                name="actions.toggling_repeat_track",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Can toggle repeat on track.,
+            OutputParameter(
+                name="actions.transferring_playback",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Can transfer playback.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Check_if_user_has_saved_specific_tracks.method,
-                Check_if_user_has_saved_specific_tracks.url,
-                Check_if_user_has_saved_specific_tracks.args_in_url,
+            out = self.api_config.request(
+                Get_the_Users_Currently_Playing_Track.method,
+                Get_the_Users_Currently_Playing_Track.url,
+                Get_the_Users_Currently_Playing_Track.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = f"Error running function 'Check_if_user_has_saved_specific_tracks': {str(e)}"
+            error_msg = f"Error running function 'Get_the_Users_Currently_Playing_Track': {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
 class Save_Tracks_for_Current_User(BaseFunction):
-    """Endpoint to save one or more tracks to the current user's 'Your Music' library. Supports either a comma-separated string of IDs or an array of IDs in the request body."""
+    """This endpoint allows the user to save one or multiple tracks to their 'Your Music' library. The 'ids' parameter can be provided as a comma-separated string or as a JSON array of strings."""
 
     name = "Save Tracks for Current User"
     url = "https://api.spotify.com/v1/me/tracks"
@@ -2811,30 +2629,24 @@ class Save_Tracks_for_Current_User(BaseFunction):
     method = "PUT"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="ids", param_type=ParameterType.STRING, required=True
-            ),  # A comma-separated list of the Spotify IDs of the tracks to save. Maximum: 50 IDs. Example: '7ouMYWpwJ422jRcDASZB7P,4VqPOruhp5EdPBeR92t6lQ,2takcwOaAZWiXQijPHIx7B'.,
+            ),  # A comma-separated list of the Spotify IDs of the tracks to save. Maximum: 50 IDs. Example: '7ouMYWpwJ422jRcDASZB7P,4VqPOruhp5EdPBeR92t6lQ,2takcwOaAZWiXQijPHIx7B',
             Parameter(
-                name="ids", param_type=ParameterType.STRING, required=True
-            ),  # An array of track Spotify IDs. Maximum: 50 items. Example: ['4iV5W9uYEdYUVa79Axb7Rh','1301WleyT98MSxVHPZCA6M']. If 'ids' parameter is present in the query string, any IDs listed in the body will be ignored.
+                name="ids", param_type=OutputParameterType.OBJECT, required=True
+            ),  # A JSON array of Spotify track IDs. Maximum 50 items. Example: ['4iV5W9uYEdYUVa79Axb7Rh', '1301WleyT98MSxVHPZCA6M'].
         ]
 
     def get_output_schema(self):
-        return [
-            OutputParameter(
-                name="status_code",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # HTTP status code indicating the result. Examples: '200' for success, '401' for Unauthorized, '403' for Forbidden, '429' for Too Many Requests.
-        ]
+        return []
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Save_Tracks_for_Current_User.method,
                 Save_Tracks_for_Current_User.url,
                 Save_Tracks_for_Current_User.args_in_url,
@@ -2849,46 +2661,44 @@ class Save_Tracks_for_Current_User(BaseFunction):
             raise ValueError(error_msg)
 
 
-class Skip_to_Next_Track(BaseFunction):
-    """API to skip to the next track in the user's queue. Works only for users with Spotify Premium."""
+class Skip_To_Next_Track(BaseFunction):
+    """Skips to the next track in the user's current playback queue. This API only works for users with Spotify Premium. If 'device_id' is provided, the command targets that device; otherwise, the user's active device is used."""
 
-    name = "Skip to Next Track"
+    name = "Skip To Next Track"
     url = "https://api.spotify.com/v1/me/player/next"
-    args_in_url = False
+    args_in_url = True
     method = "PUT"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
-        return []
+        return [
+            Parameter(
+                name="device_id", param_type=ParameterType.STRING, required=False
+            ),  # The ID of the device this command is targeting. If not provided, the currently active device of the user will be targeted. Example: '0d1841b0976bae2a3a310dd74c0f3df354899bc8'
+        ]
 
     def get_output_schema(self):
-        return [
-            OutputParameter(
-                name="status_code",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # HTTP status code indicating the result. Examples: '204' No Content on success, '401' Unauthorized, '403' Forbidden, '429' Too Many Requests.
-        ]
+        return []
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Skip_to_Next_Track.method,
-                Skip_to_Next_Track.url,
-                Skip_to_Next_Track.args_in_url,
+            out = self.api_config.request(
+                Skip_To_Next_Track.method,
+                Skip_To_Next_Track.url,
+                Skip_To_Next_Track.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = f"Error running function 'Skip_to_Next_Track': {str(e)}"
+            error_msg = f"Error running function 'Skip_To_Next_Track': {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
 class Get_an_Audiobook(BaseFunction):
-    """API endpoint to retrieve detailed information for a specific audiobook by its Spotify ID, possibly filtered by market."""
+    """API endpoints related to various Spotify content, including saving tracks, skipping playback, and retrieving audiobook details, with parameters and response structures detailed for each."""
 
     name = "Get an Audiobook"
     url = "https://api.spotify.com/v1/audiobooks/{id}"
@@ -2896,41 +2706,41 @@ class Get_an_Audiobook(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="id", param_type=ParameterType.STRING, required=True
-            ),  # The Spotify ID for the audiobook. Example: '7iHfbu1YPACw6oZPAFJtqe'.,
+            ),  # The Spotify ID of the audiobook. Example: '7iHfbu1YPACw6oZPAFJtqe'.,
             Parameter(
                 name="market", param_type=ParameterType.STRING, required=False
-            ),  # An ISO 3166-1 alpha-2 country code. If specified, only content available in that market will be returned. If the user has a valid access token, the country associated with the user account takes priority. Example: 'ES'.
+            ),  # An ISO 3166-1 alpha-2 country code to specify the market. If not provided, the market will be determined by the user token or defaults.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
                 name="authors", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # List of authors for the audiobook.,
+            ),  # Array of author objects for the audiobook.,
             OutputParameter(
                 name="available_markets",
                 param_type=OutputParameterType.STRING,
                 is_array=True,
-            ),  # List of country codes where the audiobook can be played.,
+            ),  # List of countries where the audiobook is available, identified by ISO 3166-1 alpha-2 codes.,
             OutputParameter(
                 name="copyrights", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Copyright statements for the audiobook.,
+            ),  # Array of copyright objects.,
             OutputParameter(
                 name="description",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # Description of the audiobook with HTML tags stripped.,
+            ),  # Plain text description of the audiobook.,
             OutputParameter(
                 name="html_description",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # Description of the audiobook which may contain HTML tags.,
+            ),  # HTML formatted description of the audiobook.,
             OutputParameter(
                 name="edition", param_type=OutputParameterType.STRING, is_array=False
             ),  # Edition of the audiobook, e.g., 'Unabridged'.,
@@ -2941,19 +2751,19 @@ class Get_an_Audiobook(BaseFunction):
                 name="external_urls",
                 param_type=OutputParameterType.OBJECT,
                 is_array=False,
-            ),  # External URLs related to the audiobook.,
+            ),  # External URLs object.,
             OutputParameter(
                 name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # A link to the Web API endpoint providing full details of the audiobook.,
+            ),  # URL to the full details of the audiobook in the Web API.,
             OutputParameter(
                 name="id", param_type=OutputParameterType.STRING, is_array=False
             ),  # Spotify ID of the audiobook.,
             OutputParameter(
                 name="images", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Images of the audiobook's cover art.,
+            ),  # Array of image objects for cover art.,
             OutputParameter(
                 name="languages", param_type=OutputParameterType.STRING, is_array=True
-            ),  # Languages used in the audiobook.,
+            ),  # List of ISO 639-1 language codes used in the audiobook.,
             OutputParameter(
                 name="media_type", param_type=OutputParameterType.STRING, is_array=False
             ),  # Media type of the audiobook.,
@@ -2962,16 +2772,16 @@ class Get_an_Audiobook(BaseFunction):
             ),  # Name of the audiobook.,
             OutputParameter(
                 name="narrators", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # List of narrators for the audiobook.,
+            ),  # Array of narrator objects.,
             OutputParameter(
                 name="publisher", param_type=OutputParameterType.STRING, is_array=False
             ),  # Publisher of the audiobook.,
             OutputParameter(
                 name="type", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Object type, e.g., 'audiobook'.,
+            ),  # The object type, always 'audiobook'.,
             OutputParameter(
                 name="uri", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify URI of the audiobook.,
+            ),  # Spotify URI for the audiobook.,
             OutputParameter(
                 name="total_chapters",
                 param_type=OutputParameterType.INTEGER,
@@ -2979,22 +2789,142 @@ class Get_an_Audiobook(BaseFunction):
             ),  # Number of chapters in the audiobook.,
             OutputParameter(
                 name="chapters", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # Chapter information including pagination and items.,
+            ),  # Object containing pagination and items for chapters.,
+            OutputParameter(
+                name="href", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Link to the API endpoint returning full chapter results.,
+            OutputParameter(
+                name="limit", param_type=OutputParameterType.INTEGER, is_array=False
+            ),  # Maximum number of chapters returned per page.,
+            OutputParameter(
+                name="next", param_type=OutputParameterType.STRING, is_array=True
+            ),  # URL to next page of results, null if none.,
+            OutputParameter(
+                name="offset", param_type=OutputParameterType.INTEGER, is_array=False
+            ),  # Offset of the current page.,
+            OutputParameter(
+                name="previous", param_type=OutputParameterType.STRING, is_array=True
+            ),  # URL to previous page, null if none.,
+            OutputParameter(
+                name="total", param_type=OutputParameterType.INTEGER, is_array=False
+            ),  # Total number of chapters available.,
+            OutputParameter(
+                name="items", param_type=OutputParameterType.OBJECT, is_array=True
+            ),  # Array of chapter objects.,
+            OutputParameter(
+                name="audio_preview_url",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # URL to a 30 second preview MP3 of the chapter, nullable.,
+            OutputParameter(
+                name="available_markets",
+                param_type=OutputParameterType.STRING,
+                is_array=True,
+            ),  # Countries where the chapter can be played.,
+            OutputParameter(
+                name="chapter_number",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # The number of the chapter.,
+            OutputParameter(
+                name="description",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Description of the chapter.,
+            OutputParameter(
+                name="html_description",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # HTML formatted description of the chapter.,
+            OutputParameter(
+                name="duration_ms",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Length of the chapter in milliseconds.,
+            OutputParameter(
+                name="explicit", param_type=OutputParameterType.BOOLEAN, is_array=False
+            ),  # Whether the chapter has explicit content.,
+            OutputParameter(
+                name="external_urls",
+                param_type=OutputParameterType.OBJECT,
+                is_array=False,
+            ),  # External URLs object.,
+            OutputParameter(
+                name="spotify", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Spotify URL for the chapter.,
+            OutputParameter(
+                name="href", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Link to the Web API endpoint for this chapter.,
+            OutputParameter(
+                name="id", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Spotify ID for the chapter.,
+            OutputParameter(
+                name="images", param_type=OutputParameterType.OBJECT, is_array=True
+            ),  # Array of images for chapter cover art.,
+            OutputParameter(
+                name="url", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Image URL.,
+            OutputParameter(
+                name="height", param_type=OutputParameterType.INTEGER, is_array=True
+            ),  # Height of the image in pixels, nullable.,
+            OutputParameter(
+                name="width", param_type=OutputParameterType.INTEGER, is_array=True
+            ),  # Width of the image in pixels, nullable.,
             OutputParameter(
                 name="is_playable",
                 param_type=OutputParameterType.BOOLEAN,
                 is_array=False,
-            ),  # Indicates if the chapter is playable in the current market.,
+            ),  # Indicates if the chapter is playable in the market.,
+            OutputParameter(
+                name="languages", param_type=OutputParameterType.STRING, is_array=True
+            ),  # List of ISO 639-1 language codes in the chapter.,
+            OutputParameter(
+                name="name", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Chapter name.,
+            OutputParameter(
+                name="release_date",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Release date, format 'YYYY-MM-DD'.,
+            OutputParameter(
+                name="release_date_precision",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Precision of the release date: 'year', 'month', 'day'.,
+            OutputParameter(
+                name="resume_point",
+                param_type=OutputParameterType.OBJECT,
+                is_array=False,
+            ),  # Object with user's playback position in the chapter.,
+            OutputParameter(
+                name="fully_played",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Whether the chapter has been fully played.,
+            OutputParameter(
+                name="resume_position_ms",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Recent position in milliseconds.,
+            OutputParameter(
+                name="type", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Object type, always 'episode'.,
+            OutputParameter(
+                name="uri", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Spotify URI of the chapter.,
             OutputParameter(
                 name="restrictions",
                 param_type=OutputParameterType.OBJECT,
                 is_array=False,
-            ),  # Content restrictions applied to the audiobook.
+            ),  # Restrictions applied to the content.,
+            OutputParameter(
+                name="reason", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Reason for restriction, e.g., 'market', 'product', 'explicit', 'payment_required'.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_an_Audiobook.method,
                 Get_an_Audiobook.url,
                 Get_an_Audiobook.args_in_url,
@@ -3007,375 +2937,168 @@ class Get_an_Audiobook(BaseFunction):
             raise ValueError(error_msg)
 
 
-class Get_a_single_tracks_audio_analysis(BaseFunction):
-    """JSON schema for the response of retrieving a track's audio analysis, including metadata, track info, and detailed musical features."""
+class Get_Audio_Analysis_for_a_Track(BaseFunction):
+    """This endpoint provides a detailed audio analysis of a track, describing its structure, rhythm, pitch, timbre, and other musical content."""
 
-    name = "Get a single track's audio analysis"
+    name = "Get Audio Analysis for a Track"
     url = "https://api.spotify.com/v1/audio-analysis/{id}"
     args_in_url = True
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="id", param_type=ParameterType.STRING, required=True
-            ),  # The Spotify ID for the track. Example: `11dFghVXANMlKmJXsNCbNl`.
+            ),  # The Spotify ID for the track. Example: '11dFghVXANMlKmJXsNCbNl'
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
                 name="meta", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # Metadata about the analysis, including analyzer version, platform, status codes, timestamp, analysis time, and input process.,
-            OutputParameter(
-                name="meta.analyzer_version",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # The version of the analyzer used to analyze this track. Example: "4.0.0".,
-            OutputParameter(
-                name="meta.platform",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # The platform used to read the track's audio data. Example: "Linux".,
-            OutputParameter(
-                name="meta.detailed_status",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # A detailed status code. Example: "OK".,
-            OutputParameter(
-                name="meta.status_code",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Return code: 0 if successful.,
-            OutputParameter(
-                name="meta.timestamp",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Unix timestamp when the track was analyzed. Example: 1495193577.,
-            OutputParameter(
-                name="meta.analysis_time",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Time taken to analyze the track in seconds. Example: 6.93906.,
-            OutputParameter(
-                name="meta.input_process",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # The method used to read the track's audio data. Example: "libvorbisfile L+R 44100->22050".,
+            ),  # Metadata about the analysis including version, platform, status, timestamp, analysis time, and input process.,
             OutputParameter(
                 name="track", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # Track information including number of samples, duration, sample MD5, offset, window size, sample rate, channels, fade timings, loudness, tempo, key, mode, and codestrings.,
-            OutputParameter(
-                name="track.num_samples",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Number of samples analyzed from this track. Example: 4585515.,
-            OutputParameter(
-                name="track.duration",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Length of the track in seconds. Example: 207.95985.,
-            OutputParameter(
-                name="track.sample_md5",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Always contains an empty string.,
-            OutputParameter(
-                name="track.offset_seconds",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Offset to the start of the analysis region. Usually 0.,
-            OutputParameter(
-                name="track.window_seconds",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Length of the analyzed region of the track, usually 0.,
-            OutputParameter(
-                name="track.analysis_sample_rate",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Sample rate used for decoding and analysis. Example: 22050.,
-            OutputParameter(
-                name="track.analysis_channels",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Number of channels used for analysis. Example: 1.,
-            OutputParameter(
-                name="track.end_of_fade_in",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Seconds at which fade-in ends. Example: 0.,
-            OutputParameter(
-                name="track.start_of_fade_out",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Seconds at which fade-out starts. Example: 201.13705.,
-            OutputParameter(
-                name="track.loudness",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Overall loudness in decibels, range typically -60 to 0.,
-            OutputParameter(
-                name="track.tempo", param_type=OutputParameterType.FLOAT, is_array=False
-            ),  # Estimated tempo in BPM. Example: 118.211.,
-            OutputParameter(
-                name="track.tempo_confidence",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Confidence in tempo estimation, between 0.0 and 1.0. Example: 0.73.,
-            OutputParameter(
-                name="track.time_signature",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Estimated time signature, between 3 and 7. Example: 4.,
-            OutputParameter(
-                name="track.time_signature_confidence",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Confidence in time signature, between 0.0 and 1.0. Example: 0.994.,
-            OutputParameter(
-                name="track.key", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # The key of the track, -1 if not detected. Values map to pitch classes. Example: 9.,
-            OutputParameter(
-                name="track.key_confidence",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Confidence in key detection, between 0.0 and 1.0. Example: 0.408.,
-            OutputParameter(
-                name="track.mode",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Mode: 0 (minor) or 1 (major). Example: 0.,
-            OutputParameter(
-                name="track.mode_confidence",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Confidence in mode detection, 0.0 to 1.0. Example: 0.485.,
-            OutputParameter(
-                name="track.codestring",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Echo Nest Musical Fingerprint codestring.,
-            OutputParameter(
-                name="track.code_version",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Version number of the codestring format. Example: 3.15.,
-            OutputParameter(
-                name="track.echoprintstring",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # EchoPrint codestring.,
-            OutputParameter(
-                name="track.echoprint_version",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Version of the EchoPrint format, e.g., 4.15.,
-            OutputParameter(
-                name="track.synchstring",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Synchstring for the track.,
-            OutputParameter(
-                name="track.synch_version",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Version of the Synchstring, usually 1.,
-            OutputParameter(
-                name="track.rhythmstring",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Rhythmstring for the track.,
-            OutputParameter(
-                name="track.rhythm_version",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Version number for Rhythmstring, usually 1.,
-            OutputParameter(
-                name="bars", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Array of bar objects, each with start, duration, and confidence.,
-            OutputParameter(
-                name="bars.start", param_type=OutputParameterType.FLOAT, is_array=False
-            ),  # Start time in seconds. Example: 0.49567.,
-            OutputParameter(
-                name="bars.duration",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Duration in seconds. Example: 2.18749.,
-            OutputParameter(
-                name="bars.confidence",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Confidence level, 0.0 to 1.0. Example: 0.925.,
-            OutputParameter(
-                name="beats", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Array of beat objects, each with start, duration, and confidence.,
-            OutputParameter(
-                name="beats.start", param_type=OutputParameterType.FLOAT, is_array=False
-            ),  # Start time in seconds. Example: 0.49567.,
-            OutputParameter(
-                name="beats.duration",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Duration in seconds. Example: 2.18749.,
-            OutputParameter(
-                name="beats.confidence",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Confidence level, 0.0 to 1.0. Example: 0.925.,
-            OutputParameter(
-                name="sections", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Array of section objects, each with start, duration, confidence, loudness, tempo, key, mode, and time signature.,
-            OutputParameter(
-                name="sections.start",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Section start time in seconds.,
-            OutputParameter(
-                name="sections.duration",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Duration of the section in seconds.,
-            OutputParameter(
-                name="sections.confidence",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Confidence level, 0.0 to 1.0.,
-            OutputParameter(
-                name="sections.loudness",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Loudness in decibels.,
-            OutputParameter(
-                name="sections.tempo",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Tempo in BPM.,
-            OutputParameter(
-                name="sections.tempo_confidence",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Confidence in tempo estimation.,
-            OutputParameter(
-                name="sections.key",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Key of the section, -1 if undetected.,
-            OutputParameter(
-                name="sections.key_confidence",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Confidence in key detection.,
-            OutputParameter(
-                name="sections.mode",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Mode: 0 (minor), 1 (major), or -1 if no result.,
-            OutputParameter(
-                name="sections.mode_confidence",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Confidence in mode detection.,
-            OutputParameter(
-                name="sections.time_signature",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Time signature. Range 3-7.,
-            OutputParameter(
-                name="sections.time_signature_confidence",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Confidence in time signature detection.,
-            OutputParameter(
-                name="segments", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Array of segment objects with detailed audio feature data.,
-            OutputParameter(
-                name="segments.start",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Segment start time in seconds.,
-            OutputParameter(
-                name="segments.duration",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Segment duration in seconds.,
-            OutputParameter(
-                name="segments.confidence",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Confidence in segmentation.,
-            OutputParameter(
-                name="segments.loudness_start",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Loudness at segment start in decibels.,
-            OutputParameter(
-                name="segments.loudness_max",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Maximum loudness in decibels.,
-            OutputParameter(
-                name="segments.loudness_max_time",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Time to reach maximum loudness within the segment.,
-            OutputParameter(
-                name="segments.loudness_end",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Loudness at segment end in decibels.,
-            OutputParameter(
-                name="segments.pitches",
-                param_type=OutputParameterType.FLOAT,
-                is_array=True,
-            ),  # Array of 12 pitch content values, each between 0 and 1.,
-            OutputParameter(
-                name="segments.timbre",
-                param_type=OutputParameterType.FLOAT,
-                is_array=True,
-            ),  # Array of 12 timbre coefficients.,
-            OutputParameter(
-                name="tatums", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Array of tatum objects with start, duration, and confidence.,
-            OutputParameter(
-                name="tatums.start",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Start time in seconds.,
-            OutputParameter(
-                name="tatums.duration",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Duration in seconds.,
-            OutputParameter(
-                name="tatums.confidence",
-                param_type=OutputParameterType.FLOAT,
-                is_array=False,
-            ),  # Confidence level, 0.0 to 1.0.
+            ),  # Track-specific analysis data including samples, duration, loudness, tempo, key, mode, segments, bars, beats, sections, tatums, and various analysis features.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Get_a_single_tracks_audio_analysis.method,
-                Get_a_single_tracks_audio_analysis.url,
-                Get_a_single_tracks_audio_analysis.args_in_url,
+            out = self.api_config.request(
+                Get_Audio_Analysis_for_a_Track.method,
+                Get_Audio_Analysis_for_a_Track.url,
+                Get_Audio_Analysis_for_a_Track.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
             error_msg = (
-                f"Error running function 'Get_a_single_tracks_audio_analysis': {str(e)}"
+                f"Error running function 'Get_Audio_Analysis_for_a_Track': {str(e)}"
             )
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
+class Get_Several_Episodes(BaseFunction):
+    """Retrieve multiple episodes' information based on given Spotify IDs, including metadata, images, content restrictions, and show details."""
+
+    name = "Get Several Episodes"
+    url = "https://api.spotify.com/v1/episodes"
+    args_in_url = False
+    method = "GET"
+
+    def __init__(self):
+        self.api_config = APIClientConfig()
+
+    def get_parameter_schema(self):
+        return [
+            Parameter(
+                name="ids", param_type=ParameterType.STRING, required=True
+            ),  # A comma-separated list of Spotify IDs for the episodes. Maximum: 50. Example: '77o6BIVlYM3msb4MMIL1jH,0Q86acNRm6V9GYx55SXKwf'.,
+            Parameter(
+                name="market", param_type=ParameterType.STRING, required=False
+            ),  # An ISO 3166-1 alpha-2 country code to specify the market. Example: 'ES'.
+        ]
+
+    def get_output_schema(self):
+        return [
+            OutputParameter(
+                name="episodes", param_type=OutputParameterType.OBJECT, is_array=True
+            ),  # Array of episode objects containing details such as preview URL, description, duration, explicit content indicator, external URLs, id, images, availability, language, name, release date, resume point, type, uri, restrictions, and show information.
+        ]
+
+    def process(self, input_data: StandardInput) -> StandardOutput:
+        try:
+            out = self.api_config.request(
+                Get_Several_Episodes.method,
+                Get_Several_Episodes.url,
+                Get_Several_Episodes.args_in_url,
+                input_data.validated_data,
+            )
+            return StandardOutput(out, self.get_output_schema())
+        except Exception as e:
+            error_msg = f"Error running function 'Get_Several_Episodes': {str(e)}"
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+
+class Get_a_list_of_available_genre_seeds(BaseFunction):
+    """Fetch a list of available genres that can be used as seed genres for generating recommendations."""
+
+    name = "Get a list of available genre seeds"
+    url = "https://api.spotify.com/v1/recommendations/available-genre-seeds"
+    args_in_url = False
+    method = "GET"
+
+    def __init__(self):
+        self.api_config = APIClientConfig()
+
+    def get_parameter_schema(self):
+        return []
+
+    def get_output_schema(self):
+        return [
+            OutputParameter(
+                name="genres", param_type=OutputParameterType.STRING, is_array=True
+            ),  # List of available genres for recommendations, e.g., 'rock', 'pop', 'jazz', etc.
+        ]
+
+    def process(self, input_data: StandardInput) -> StandardOutput:
+        try:
+            out = self.api_config.request(
+                Get_a_list_of_available_genre_seeds.method,
+                Get_a_list_of_available_genre_seeds.url,
+                Get_a_list_of_available_genre_seeds.args_in_url,
+                input_data.validated_data,
+            )
+            return StandardOutput(out, self.get_output_schema())
+        except Exception as e:
+            error_msg = f"Error running function 'Get_a_list_of_available_genre_seeds': {str(e)}"
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+
+class Get_available_markets(BaseFunction):
+    """Retrieve a list of markets (countries) where Spotify content and features are available."""
+
+    name = "Get available markets"
+    url = "https://api.spotify.com/v1/markets"
+    args_in_url = False
+    method = "GET"
+
+    def __init__(self):
+        self.api_config = APIClientConfig()
+
+    def get_parameter_schema(self):
+        return []
+
+    def get_output_schema(self):
+        return [
+            OutputParameter(
+                name="markets", param_type=OutputParameterType.STRING, is_array=True
+            ),  # List of ISO 3166-1 alpha-2 country codes where Spotify is available, e.g., 'US', 'SE', 'DE', etc.
+        ]
+
+    def process(self, input_data: StandardInput) -> StandardOutput:
+        try:
+            out = self.api_config.request(
+                Get_available_markets.method,
+                Get_available_markets.url,
+                Get_available_markets.args_in_url,
+                input_data.validated_data,
+            )
+            return StandardOutput(out, self.get_output_schema())
+        except Exception as e:
+            error_msg = f"Error running function 'Get_available_markets': {str(e)}"
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+
 class Get_Recently_Played_Tracks(BaseFunction):
-    """"""
+    """Retrieve the current user's recently played tracks. Note: Does not support podcast episodes."""
 
     name = "Get Recently Played Tracks"
     url = "https://api.spotify.com/v1/me/player/recently-played"
@@ -3383,16 +3106,16 @@ class Get_Recently_Played_Tracks(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="limit", param_type=ParameterType.INTEGER, required=False
-            ),  # The maximum number of items to return. Default: 20. Minimum: 1. Maximum: 50.,
+            ),  # The maximum number of items to return. Default: 20. Minimum: 1. Maximum: 50. Default: `limit=20`. Range: `0` - `50`. Example: `limit=10`.,
             Parameter(
                 name="after", param_type=ParameterType.INTEGER, required=False
-            ),  # A Unix timestamp in milliseconds. Returns all items after (but not including) this cursor position. If `after` is specified, `before` must not be specified.,
+            ),  # A Unix timestamp in milliseconds. Returns all items after (but not including) this cursor position. If `after` is specified, `before` must not be specified. Example: `after=1484811043508`.,
             Parameter(
                 name="before", param_type=ParameterType.INTEGER, required=False
             ),  # A Unix timestamp in milliseconds. Returns all items before (but not including) this cursor position. If `before` is specified, `after` must not be specified.
@@ -3408,21 +3131,31 @@ class Get_Recently_Played_Tracks(BaseFunction):
             ),  # The maximum number of items in the response (as set in the query or by default).,
             OutputParameter(
                 name="next", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to the next page of items. ( `null` if none),
+            ),  # URL to the next page of items. (`null` if none),
             OutputParameter(
                 name="cursors", param_type=OutputParameterType.OBJECT, is_array=False
             ),  # The cursors used to find the next set of items.,
+            OutputParameter(
+                name="cursors.after",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # The cursor to use as key to find the next page of items.,
+            OutputParameter(
+                name="cursors.before",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # The cursor to use as key to find the previous page of items.,
             OutputParameter(
                 name="total", param_type=OutputParameterType.INTEGER, is_array=False
             ),  # The total number of items available to return.,
             OutputParameter(
                 name="items", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # A paged set of tracks containing Track and Played_at.
+            ),  # A paged set of tracks
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_Recently_Played_Tracks.method,
                 Get_Recently_Played_Tracks.url,
                 Get_Recently_Played_Tracks.args_in_url,
@@ -3436,7 +3169,7 @@ class Get_Recently_Played_Tracks(BaseFunction):
 
 
 class Get_a_Show(BaseFunction):
-    """"""
+    """Retrieve information about the current user's playback state, including track or episode, progress, and active device."""
 
     name = "Get a Show"
     url = "https://api.spotify.com/v1/shows/{id}"
@@ -3444,16 +3177,16 @@ class Get_a_Show(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="market", param_type=ParameterType.STRING, required=False
-            ),  # An [ISO 3166-1 alpha-2 country code](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2). If a country code is specified, only content that is available in that market will be returned. The country associated with the user account will take priority over this parameter if a valid user access token is provided. Example: `market=ES`.,
+            ),  # An [ISO 3166-1 alpha-2 country code](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2). If specified, only content available in this market will be returned. If a user access token is provided, the user's country takes priority. Example: `market=ES`.,
             Parameter(
                 name="id", param_type=ParameterType.STRING, required=True
-            ),  # The [Spotify ID] for the show. Example: `38bS44xjbVVZ3No3ByF1dJ`.
+            ),  # The [Spotify ID](https://en.wikipedia.org/wiki/Spotify_URI_scheme#Spotify_IDs) for the show. Example: `38bS44xjbVVZ3No3ByF1dJ`.
         ]
 
     def get_output_schema(self):
@@ -3462,37 +3195,65 @@ class Get_a_Show(BaseFunction):
                 name="available_markets",
                 param_type=OutputParameterType.STRING,
                 is_array=True,
-            ),  # A list of the countries in which the show can be played, identified by their [ISO 3166-1 alpha-2](http://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) code.,
+            ),  # List of countries where the show can be played, identified by ISO 3166-1 alpha-2 codes.,
             OutputParameter(
                 name="copyrights", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # The copyright statements of the show.,
+            ),  # Copyright statements of the show.,
+            OutputParameter(
+                name="copyrights.text",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # The copyright text.,
+            OutputParameter(
+                name="copyrights.type",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # The type of copyright: `C` or `P`.,
             OutputParameter(
                 name="description",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # A description of the show. HTML tags are stripped away.,
+            ),  # Description of the show with HTML tags stripped.,
             OutputParameter(
                 name="html_description",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # A description of the show. This field may contain HTML tags.,
+            ),  # Description of the show, may contain HTML tags.,
             OutputParameter(
                 name="explicit", param_type=OutputParameterType.BOOLEAN, is_array=False
-            ),  # Whether or not the show has explicit content.,
+            ),  # Indicates if the show has explicit content.,
             OutputParameter(
                 name="external_urls",
                 param_type=OutputParameterType.OBJECT,
                 is_array=False,
-            ),  # External URLs for this show.,
+            ),  # External URLs for the show.,
+            OutputParameter(
+                name="external_urls.spotify",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Spotify URL for the show.,
             OutputParameter(
                 name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # A link to the Web API endpoint providing full details of the show.,
+            ),  # Link to Web API endpoint for full show details.,
             OutputParameter(
                 name="id", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The [Spotify ID] for the show.,
+            ),  # Spotify ID for the show.,
             OutputParameter(
                 name="images", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # The cover art for the show in various sizes.,
+            ),  # Cover art images.,
+            OutputParameter(
+                name="images.url", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Image source URL.,
+            OutputParameter(
+                name="images.height",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Image height in pixels. Nullable.,
+            OutputParameter(
+                name="images.width",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Image width in pixels. Nullable.,
             OutputParameter(
                 name="is_externally_hosted",
                 param_type=OutputParameterType.BOOLEAN,
@@ -3500,43 +3261,369 @@ class Get_a_Show(BaseFunction):
             ),  # True if all episodes are hosted outside Spotify's CDN.,
             OutputParameter(
                 name="languages", param_type=OutputParameterType.STRING, is_array=True
-            ),  # A list of the languages used in the show, identified by their ISO 639 codes.,
+            ),  # List of ISO 639 codes for languages used.,
             OutputParameter(
                 name="media_type", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The media type of the show.,
+            ),  # Media type of the show.,
             OutputParameter(
                 name="name", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The name of the show.,
+            ),  # Name of the show.,
             OutputParameter(
                 name="publisher", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The publisher of the show.,
+            ),  # Publisher of the show.,
             OutputParameter(
                 name="type", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The object type: "show".,
+            ),  # Object type, e.g., `show`.,
             OutputParameter(
                 name="uri", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The [Spotify URI] for the show.,
+            ),  # Spotify URI for the show.,
             OutputParameter(
                 name="total_episodes",
                 param_type=OutputParameterType.INTEGER,
                 is_array=False,
-            ),  # The total number of episodes in the show.,
+            ),  # Total number of episodes in the show.,
             OutputParameter(
                 name="episodes", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # The episodes of the show.,
+            ),  # Episodes of the show.,
+            OutputParameter(
+                name="episodes.href",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Link to the endpoint returning full episodes.,
+            OutputParameter(
+                name="episodes.limit",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Maximum number of episodes returned.,
+            OutputParameter(
+                name="episodes.next",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # URL to next page of episodes or `null`.,
+            OutputParameter(
+                name="episodes.offset",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Offset of the episodes returned.,
+            OutputParameter(
+                name="episodes.previous",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # URL to previous page or `null`.,
+            OutputParameter(
+                name="episodes.total",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Total number of episodes.,
+            OutputParameter(
+                name="episodes.items",
+                param_type=OutputParameterType.OBJECT,
+                is_array=True,
+            ),  # List of episode objects.,
+            OutputParameter(
+                name="episodes.items.audio_preview_url",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Nullable URL to a 30s preview. Deprecated. Nullable.,
+            OutputParameter(
+                name="episodes.items.description",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Description with HTML tags stripped.,
+            OutputParameter(
+                name="episodes.items.html_description",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Description may contain HTML tags.,
+            OutputParameter(
+                name="episodes.items.duration_ms",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Length of episode in milliseconds.,
+            OutputParameter(
+                name="episodes.items.explicit",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Whether the episode has explicit content.,
+            OutputParameter(
+                name="episodes.items.external_urls",
+                param_type=OutputParameterType.OBJECT,
+                is_array=False,
+            ),  # External URLs.,
+            OutputParameter(
+                name="episodes.items.external_urls.spotify",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Spotify URL.,
+            OutputParameter(
+                name="episodes.items.href",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # API endpoint for episode details.,
+            OutputParameter(
+                name="episodes.items.id",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Spotify ID of the episode.,
+            OutputParameter(
+                name="episodes.items.images",
+                param_type=OutputParameterType.OBJECT,
+                is_array=True,
+            ),  # Cover art images.,
+            OutputParameter(
+                name="episodes.items.images.url",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Image URL.,
+            OutputParameter(
+                name="episodes.items.images.height",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Nullable height in pixels.,
+            OutputParameter(
+                name="episodes.items.images.width",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Nullable width in pixels.,
+            OutputParameter(
+                name="episodes.items.is_externally_hosted",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # True if hosted outside Spotify.,
+            OutputParameter(
+                name="episodes.items.is_playable",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Is playable in current market.,
+            OutputParameter(
+                name="episodes.items.language",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Deprecated. ISO 639 code of episode language.,
+            OutputParameter(
+                name="episodes.items.languages",
+                param_type=OutputParameterType.STRING,
+                is_array=True,
+            ),  # List of ISO 639 codes for languages used.,
+            OutputParameter(
+                name="episodes.items.name",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Name of the episode.,
+            OutputParameter(
+                name="episodes.items.release_date",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # First release date, format: `YYYY-MM-DD` or partial.,
+            OutputParameter(
+                name="episodes.items.release_date_precision",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Precision of release date: `year`, `month`, or `day`.,
+            OutputParameter(
+                name="episodes.items.resume_point",
+                param_type=OutputParameterType.OBJECT,
+                is_array=False,
+            ),  # User's most recent position in the episode.,
+            OutputParameter(
+                name="episodes.items.resume_point.fully_played",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Whether the episode has been fully played.,
+            OutputParameter(
+                name="episodes.items.resume_point.resume_position_ms",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Most recent position in milliseconds.,
+            OutputParameter(
+                name="episodes.items.type",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Object type, e.g., `episode`.,
+            OutputParameter(
+                name="episodes.items.uri",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Spotify URI for the episode.,
+            OutputParameter(
+                name="episodes.items.restrictions",
+                param_type=OutputParameterType.OBJECT,
+                is_array=False,
+            ),  # Content restrictions.,
+            OutputParameter(
+                name="episodes.items.restrictions.reason",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Reason for restriction: `market`, `product`, or `explicit`.,
+            OutputParameter(
+                name="show", param_type=OutputParameterType.OBJECT, is_array=False
+            ),  # Show object the episode belongs to.,
+            OutputParameter(
+                name="show.available_markets",
+                param_type=OutputParameterType.STRING,
+                is_array=True,
+            ),  # Countries where show can be played.,
+            OutputParameter(
+                name="show.copyrights",
+                param_type=OutputParameterType.OBJECT,
+                is_array=True,
+            ),  # Copyrights of the show.,
+            OutputParameter(
+                name="show.copyrights.text",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Copyright text.,
+            OutputParameter(
+                name="show.copyrights.type",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Type of copyright (`C` or `P`).,
+            OutputParameter(
+                name="show.description",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Description of the show without HTML tags.,
+            OutputParameter(
+                name="show.html_description",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Description of the show may contain HTML tags.,
+            OutputParameter(
+                name="show.explicit",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Whether the show has explicit content.,
+            OutputParameter(
+                name="show.external_urls",
+                param_type=OutputParameterType.OBJECT,
+                is_array=False,
+            ),  # External URLs for the show.,
+            OutputParameter(
+                name="show.external_urls.spotify",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Spotify URL for the show.,
+            OutputParameter(
+                name="show.href", param_type=OutputParameterType.STRING, is_array=False
+            ),  # API link for show details.,
+            OutputParameter(
+                name="show.id", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Spotify ID for the show.,
+            OutputParameter(
+                name="show.images", param_type=OutputParameterType.OBJECT, is_array=True
+            ),  # Cover art images.,
+            OutputParameter(
+                name="show.images.url",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Image URL.,
+            OutputParameter(
+                name="show.images.height",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Nullable height.,
+            OutputParameter(
+                name="show.images.width",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Nullable width.,
+            OutputParameter(
+                name="show.is_externally_hosted",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # True if episodes are hosted outside Spotify.,
+            OutputParameter(
+                name="show.languages",
+                param_type=OutputParameterType.STRING,
+                is_array=True,
+            ),  # List of ISO 639 language codes.,
+            OutputParameter(
+                name="show.media_type",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Media type of the show.,
+            OutputParameter(
+                name="show.name", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Name of the show.,
+            OutputParameter(
+                name="show.publisher",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Publisher of the show.,
+            OutputParameter(
+                name="show.type", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Object type, e.g., `show`.,
+            OutputParameter(
+                name="show.uri", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Spotify URI for the show.,
+            OutputParameter(
+                name="show.total_episodes",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Total episodes in the show.,
             OutputParameter(
                 name="currently_playing_type",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # The object type of the currently playing item. Can be `track`, `episode`, `ad`, or `unknown`.,
+            ),  # Type of the currently playing item: `track`, `episode`, `ad`, or `unknown`.,
             OutputParameter(
                 name="actions", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # Allows updating the user interface based on available playback actions.
+            ),  # Playback actions available.,
+            OutputParameter(
+                name="actions.interrupting_playback",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Interrupting playback available.,
+            OutputParameter(
+                name="actions.pausing",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Pausing available.,
+            OutputParameter(
+                name="actions.resuming",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Resuming available.,
+            OutputParameter(
+                name="actions.seeking",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Seeking possible.,
+            OutputParameter(
+                name="actions.skipping_next",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Next track skipping available.,
+            OutputParameter(
+                name="actions.skipping_prev",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Previous track skipping available.,
+            OutputParameter(
+                name="actions.toggling_repeat_context",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Toggle repeat context.,
+            OutputParameter(
+                name="actions.toggling_shuffle",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Toggle shuffle.,
+            OutputParameter(
+                name="actions.toggling_repeat_track",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Toggle repeat track.,
+            OutputParameter(
+                name="actions.transferring_playback",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Transfer playback available.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_a_Show.method,
                 Get_a_Show.url,
                 Get_a_Show.args_in_url,
@@ -3549,487 +3636,299 @@ class Get_a_Show(BaseFunction):
             raise ValueError(error_msg)
 
 
-class Get_Playback_State(BaseFunction):
-    """"""
+class Get_a_Playlists_Items(BaseFunction):
+    """Retrieve the current playlist tracks, with optional field selection, pagination, and market filtering."""
 
-    name = "Get Playback State"
-    url = "https://api.spotify.com/v1/me/player"
-    args_in_url = False
-    method = "GET"
-
-    def __init__(self):
-        self.api_wrapper = api_wrapper
-
-    def get_parameter_schema(self):
-        return [
-            Parameter(
-                name="market", param_type=ParameterType.STRING, required=False
-            ),  # An [ISO 3166-1 alpha-2 country code](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2). If specified, only content available in that market will be returned. The country associated with the user account will take priority if a valid user access token is provided.,
-            Parameter(
-                name="additional_types", param_type=ParameterType.STRING, required=False
-            ),  # A comma-separated list of item types supported besides `track` (e.g., `episode`).
-        ]
-
-    def get_output_schema(self):
-        return [
-            OutputParameter(
-                name="device", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # The device currently active.,
-            OutputParameter(
-                name="repeat_state",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # The repeat state: 'off', 'track', or 'context'.,
-            OutputParameter(
-                name="shuffle_state",
-                param_type=OutputParameterType.BOOLEAN,
-                is_array=False,
-            ),  # If shuffle is on or off.,
-            OutputParameter(
-                name="context", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # The context the track was played from.,
-            OutputParameter(
-                name="timestamp", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Unix Millisecond Timestamp when playback state was last changed.,
-            OutputParameter(
-                name="progress_ms",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Progress into the currently playing track or episode in milliseconds.,
-            OutputParameter(
-                name="is_playing",
-                param_type=OutputParameterType.BOOLEAN,
-                is_array=False,
-            ),  # If something is currently playing.,
-            OutputParameter(
-                name="item", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # The currently playing track or episode, or null.,
-            OutputParameter(
-                name="currently_playing_type",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # The object type of the currently playing item: 'track', 'episode', 'ad', 'unknown'.,
-            OutputParameter(
-                name="actions", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # Actions that can be performed in the current context.
-        ]
-
-    def process(self, input_data: StandardInput) -> StandardOutput:
-        try:
-            out = self.api_wrapper.request(
-                Get_Playback_State.method,
-                Get_Playback_State.url,
-                Get_Playback_State.args_in_url,
-                input_data.validated_data,
-            )
-            return StandardOutput(out, self.get_output_schema())
-        except Exception as e:
-            error_msg = f"Error running function 'Get_Playback_State': {str(e)}"
-            logging.error(error_msg)
-            raise ValueError(error_msg)
-
-
-class Get_a_Categorys_Playlists(BaseFunction):
-    """Fetches Spotify playlists for a specific category."""
-
-    name = "Get a Category's Playlists"
-    url = "https://api.spotify.com/v1/browse/categories/{category_id}/playlists"
+    name = "Get a Playlist’s Items"
+    url = "https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
     args_in_url = True
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
-                name="category_id", param_type=ParameterType.STRING, required=True
-            ),  # The Spotify category ID, e.g. 'dinner'. This is a path parameter.,
+                name="playlist_id", param_type=ParameterType.STRING, required=True
+            ),  # The Spotify ID for the playlist.,
+            Parameter(
+                name="fields", param_type=ParameterType.STRING, required=False
+            ),  # Selector to narrow down the fields returned. Default: null.,
             Parameter(
                 name="limit", param_type=ParameterType.INTEGER, required=False
-            ),  # Maximum number of items to return. Default: 20. Range: 1-50.,
+            ),  # Maximum number of items to return. Default: 100.,
             Parameter(
                 name="offset", param_type=ParameterType.INTEGER, required=False
-            ),  # Index of the first item to return. Default: 0.
+            ),  # The index of the first item to return. Default: 0.,
+            Parameter(
+                name="market", param_type=ParameterType.STRING, required=False
+            ),  # An ISO 3166-1 alpha-2 country code. The market of the user if not specified.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
-                name="message", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The localized message of a playlist. Example: 'Popular Playlists'.,
+                name="href", param_type=OutputParameterType.STRING, is_array=False
+            ),  # A link to the Web API endpoint returning the full result of the request.,
             OutputParameter(
-                name="playlists", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # A paged set of playlists.,
+                name="items", param_type=OutputParameterType.OBJECT, is_array=True
+            ),  # The playlist tracks.,
             OutputParameter(
-                name="playlists.href",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Link to the Web API endpoint returning the full result of the request.,
+                name="limit", param_type=OutputParameterType.INTEGER, is_array=False
+            ),  # The maximum number of items in the response.,
             OutputParameter(
-                name="playlists.limit",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Maximum number of items in the response.,
+                name="next", param_type=OutputParameterType.STRING, is_array=False
+            ),  # URL to the next page of items, or null if none.,
             OutputParameter(
-                name="playlists.next",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # URL to the next page of items. Null if none.,
-            OutputParameter(
-                name="playlists.offset",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
+                name="offset", param_type=OutputParameterType.INTEGER, is_array=False
             ),  # The offset of the items returned.,
             OutputParameter(
-                name="playlists.previous",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # URL to the previous page of items. Null if none.,
+                name="previous", param_type=OutputParameterType.STRING, is_array=False
+            ),  # URL to the previous page of items, or null if none.,
             OutputParameter(
-                name="playlists.total",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Total number of items available.,
-            OutputParameter(
-                name="playlists.items",
-                param_type=OutputParameterType.OBJECT,
-                is_array=True,
-            ),  # Array of playlist objects.,
-            OutputParameter(
-                name="items.collaborative",
-                param_type=OutputParameterType.BOOLEAN,
-                is_array=False,
-            ),  # True if the owner allows modification.,
-            OutputParameter(
-                name="items.description",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Playlist description. Null if not available.,
-            OutputParameter(
-                name="items.external_urls.spotify",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Spotify URL for the playlist.,
-            OutputParameter(
-                name="items.href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Link to the Web API endpoint of the playlist.,
-            OutputParameter(
-                name="items.id", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify ID of the playlist.,
-            OutputParameter(
-                name="items.images",
-                param_type=OutputParameterType.OBJECT,
-                is_array=True,
-            ),  # Images for the playlist.,
-            OutputParameter(
-                name="images.url", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Source URL of the image.,
-            OutputParameter(
-                name="images.height",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Height of the image in pixels.,
-            OutputParameter(
-                name="images.width",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Width of the image in pixels.,
-            OutputParameter(
-                name="items.name", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Name of the playlist.,
-            OutputParameter(
-                name="items.owner",
-                param_type=OutputParameterType.OBJECT,
-                is_array=False,
-            ),  # Owner of the playlist.,
-            OutputParameter(
-                name="owner.external_urls.spotify",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Spotify URL for the owner.,
-            OutputParameter(
-                name="owner.href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Link to the owner in Web API.,
-            OutputParameter(
-                name="owner.id", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify ID of the owner.,
-            OutputParameter(
-                name="owner.type", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Object type, e.g. 'user'.,
-            OutputParameter(
-                name="owner.uri", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify URI for the owner.,
-            OutputParameter(
-                name="owner.display_name",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Display name of the owner.,
-            OutputParameter(
-                name="items.public",
-                param_type=OutputParameterType.BOOLEAN,
-                is_array=False,
-            ),  # The playlist's public/private status.,
-            OutputParameter(
-                name="items.snapshot_id",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Current version identifier of the playlist.,
-            OutputParameter(
-                name="items.tracks",
-                param_type=OutputParameterType.OBJECT,
-                is_array=False,
-            ),  # Contains link and total number of tracks.,
-            OutputParameter(
-                name="tracks.href",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Link to fetch playlist tracks.,
-            OutputParameter(
-                name="tracks.total",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Total number of tracks.,
-            OutputParameter(
-                name="items.type", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Object type, e.g. 'playlist'.,
-            OutputParameter(
-                name="items.uri", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify URI for the playlist.
+                name="total", param_type=OutputParameterType.INTEGER, is_array=False
+            ),  # The total number of tracks in the playlist.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Get_a_Categorys_Playlists.method,
-                Get_a_Categorys_Playlists.url,
-                Get_a_Categorys_Playlists.args_in_url,
+            out = self.api_config.request(
+                Get_a_Playlists_Items.method,
+                Get_a_Playlists_Items.url,
+                Get_a_Playlists_Items.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = f"Error running function 'Get_a_Categorys_Playlists': {str(e)}"
+            error_msg = f"Error running function 'Get_a_Playlists_Items': {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
-class Get_Several_Albums(BaseFunction):
-    """Fetches details for multiple albums using their Spotify IDs."""
+class Create_a_Playlist(BaseFunction):
+    """Create a new playlist for a Spotify user."""
 
-    name = "Get Several Albums"
-    url = "https://api.spotify.com/v1/albums"
-    args_in_url = False
-    method = "GET"
+    name = "Create a Playlist"
+    url = "https://api.spotify.com/v1/users/{user_id}/playlists"
+    args_in_url = True
+    method = "INSERT"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
-                name="ids", param_type=ParameterType.STRING, required=True
-            ),  # Comma-separated list of Spotify IDs. Maximum 20 IDs.,
+                name="user_id", param_type=ParameterType.STRING, required=True
+            ),  # The Spotify user ID for the user.,
             Parameter(
-                name="market", param_type=ParameterType.STRING, required=False
-            ),  # ISO 3166-1 alpha-2 country code; determines market availability.
+                name="name", param_type=ParameterType.STRING, required=True
+            ),  # The name of the new playlist.,
+            Parameter(
+                name="public", param_type=ParameterType.BOOLEAN, required=False
+            ),  # Whether the playlist is public. Default: true.,
+            Parameter(
+                name="collaborative", param_type=ParameterType.BOOLEAN, required=False
+            ),  # Whether the playlist is collaborative. Default: false.,
+            Parameter(
+                name="description", param_type=ParameterType.STRING, required=False
+            ),  # The playlist description.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
-                name="albums", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Array of Album objects.,
+                name="id", param_type=OutputParameterType.STRING, is_array=False
+            ),  # The Spotify ID for the new playlist.,
             OutputParameter(
-                name="albums.album_type",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Type of the album. Allowed: 'album', 'single', 'compilation'.,
+                name="name", param_type=OutputParameterType.STRING, is_array=False
+            ),  # The name of the playlist.,
             OutputParameter(
-                name="albums.total_tracks",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Number of tracks in the album.,
-            OutputParameter(
-                name="albums.available_markets",
-                param_type=OutputParameterType.STRING,
-                is_array=True,
-            ),  # Markets where the album is available, identified by ISO 3166-1 alpha-2 codes.,
-            OutputParameter(
-                name="albums.external_urls.spotify",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Spotify URL of the album.,
-            OutputParameter(
-                name="albums.href",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Link to the Web API endpoint of the album.,
-            OutputParameter(
-                name="albums.id", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify ID of the album.,
-            OutputParameter(
-                name="albums.images",
-                param_type=OutputParameterType.OBJECT,
-                is_array=True,
-            ),  # Album cover images.,
-            OutputParameter(
-                name="images.url", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Source URL of the image.,
-            OutputParameter(
-                name="images.height",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Image height in pixels.,
-            OutputParameter(
-                name="images.width",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Image width in pixels.,
-            OutputParameter(
-                name="albums.name",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Album name.,
-            OutputParameter(
-                name="albums.release_date",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Release date in ISO 8601 format, e.g. '1981-12'.,
-            OutputParameter(
-                name="albums.release_date_precision",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Precision of release date. Allowed: 'year', 'month', 'day'.,
-            OutputParameter(
-                name="albums.restrictions.reason",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Reason for restriction, e.g. 'market'.,
-            OutputParameter(
-                name="albums.type",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Object type, e.g. 'album'.,
-            OutputParameter(
-                name="albums.uri", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify URI of the album.,
-            OutputParameter(
-                name="albums.artists",
-                param_type=OutputParameterType.OBJECT,
-                is_array=True,
-            ),  # Artists associated with the album.,
-            OutputParameter(
-                name="artists.external_urls.spotify",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Spotify URL for the artist.,
-            OutputParameter(
-                name="artists.href",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Link to the artist in Web API.,
-            OutputParameter(
-                name="artists.id", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify ID of the artist.,
-            OutputParameter(
-                name="artists.name",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Name of the artist.,
-            OutputParameter(
-                name="artists.type",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Object type, e.g. 'artist'.,
-            OutputParameter(
-                name="artists.uri",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Spotify URI for the artist.,
-            OutputParameter(
-                name="albums.tracks",
-                param_type=OutputParameterType.OBJECT,
-                is_array=True,
-            ),  # Tracks of the album.,
-            OutputParameter(
-                name="tracks.href",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Link to fetch tracks.,
-            OutputParameter(
-                name="tracks.limit",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Maximum number of tracks in the response.,
-            OutputParameter(
-                name="tracks.next",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # URL to fetch next set of tracks; null if none.,
-            OutputParameter(
-                name="tracks.offset",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Offset for tracks.,
-            OutputParameter(
-                name="tracks.previous",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # URL to previous set of tracks; null if none.,
-            OutputParameter(
-                name="tracks.total",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Total number of tracks in album.,
-            OutputParameter(
-                name="tracks.items",
-                param_type=OutputParameterType.OBJECT,
-                is_array=True,
-            ),  # Array of track objects.,
-            OutputParameter(
-                name="items.artists",
-                param_type=OutputParameterType.OBJECT,
-                is_array=True,
-            ),  # Artists of the track.,
-            OutputParameter(
-                name="items.external_urls.spotify",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # Spotify URL for the artist.,
-            OutputParameter(
-                name="items.href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Link to track in Web API.,
-            OutputParameter(
-                name="items.id", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify ID of the track.,
-            OutputParameter(
-                name="items.name", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Track name.,
-            OutputParameter(
-                name="items.type", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Object type, e.g. 'track'.,
-            OutputParameter(
-                name="items.uri", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify URI of the track.
+                name="public", param_type=OutputParameterType.BOOLEAN, is_array=False
+            ),  # Whether the playlist is public.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Get_Several_Albums.method,
-                Get_Several_Albums.url,
-                Get_Several_Albums.args_in_url,
+            out = self.api_config.request(
+                Create_a_Playlist.method,
+                Create_a_Playlist.url,
+                Create_a_Playlist.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = f"Error running function 'Get_Several_Albums': {str(e)}"
+            error_msg = f"Error running function 'Create_a_Playlist': {str(e)}"
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+
+class Add_Items_to_a_Playlist(BaseFunction):
+    """Add one or more tracks to a playlist."""
+
+    name = "Add Items to a Playlist"
+    url = "https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
+    args_in_url = True
+    method = "PUT"
+
+    def __init__(self):
+        self.api_config = APIClientConfig()
+
+    def get_parameter_schema(self):
+        return [
+            Parameter(
+                name="playlist_id", param_type=ParameterType.STRING, required=True
+            ),  # The Spotify ID for the playlist.,
+            Parameter(
+                name="uris", param_type=ParameterType.STRING, required=True
+            ),  # A comma-separated list of Spotify URIs to add. Max: 100 per request.,
+            Parameter(
+                name="position", param_type=ParameterType.INTEGER, required=False
+            ),  # The position to insert the items in the playlist. Default: 0.
+        ]
+
+    def get_output_schema(self):
+        return []
+
+    def process(self, input_data: StandardInput) -> StandardOutput:
+        try:
+            out = self.api_config.request(
+                Add_Items_to_a_Playlist.method,
+                Add_Items_to_a_Playlist.url,
+                Add_Items_to_a_Playlist.args_in_url,
+                input_data.validated_data,
+            )
+            return StandardOutput(out, self.get_output_schema())
+        except Exception as e:
+            error_msg = f"Error running function 'Add_Items_to_a_Playlist': {str(e)}"
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+
+class Follow_a_Playlist(BaseFunction):
+    """Add the current user as a follower of a playlist."""
+
+    name = "Follow a Playlist"
+    url = "https://api.spotify.com/v1/me/playlists/\{playlist_id\}/followers"
+    args_in_url = True
+    method = "PUT"
+
+    def __init__(self):
+        self.api_config = APIClientConfig()
+
+    def get_parameter_schema(self):
+        return [
+            Parameter(
+                name="playlist_id", param_type=ParameterType.STRING, required=True
+            ),  # The Spotify ID for the playlist.
+        ]
+
+    def get_output_schema(self):
+        return []
+
+    def process(self, input_data: StandardInput) -> StandardOutput:
+        try:
+            out = self.api_config.request(
+                Follow_a_Playlist.method,
+                Follow_a_Playlist.url,
+                Follow_a_Playlist.args_in_url,
+                input_data.validated_data,
+            )
+            return StandardOutput(out, self.get_output_schema())
+        except Exception as e:
+            error_msg = f"Error running function 'Follow_a_Playlist': {str(e)}"
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+
+class Unfollow_a_Playlist(BaseFunction):
+    """Remove the current user as a follower of a playlist."""
+
+    name = "Unfollow a Playlist"
+    url = "https://api.spotify.com/v1/me/playlists/\{playlist_id\}/followers"
+    args_in_url = True
+    method = "DELETE"
+
+    def __init__(self):
+        self.api_config = APIClientConfig()
+
+    def get_parameter_schema(self):
+        return [
+            Parameter(
+                name="playlist_id", param_type=ParameterType.STRING, required=True
+            ),  # The Spotify ID for the playlist.
+        ]
+
+    def get_output_schema(self):
+        return []
+
+    def process(self, input_data: StandardInput) -> StandardOutput:
+        try:
+            out = self.api_config.request(
+                Unfollow_a_Playlist.method,
+                Unfollow_a_Playlist.url,
+                Unfollow_a_Playlist.args_in_url,
+                input_data.validated_data,
+            )
+            return StandardOutput(out, self.get_output_schema())
+        except Exception as e:
+            error_msg = f"Error running function 'Unfollow_a_Playlist': {str(e)}"
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+
+class Get_a_Playlist_Cover_Image(BaseFunction):
+    """Get the cover image for a playlist."""
+
+    name = "Get a Playlist Cover Image"
+    url = "https://api.spotify.com/v1/playlists/{playlist_id}/images"
+    args_in_url = True
+    method = "GET"
+
+    def __init__(self):
+        self.api_config = APIClientConfig()
+
+    def get_parameter_schema(self):
+        return [
+            Parameter(
+                name="playlist_id", param_type=ParameterType.STRING, required=True
+            ),  # The Spotify ID for the playlist.
+        ]
+
+    def get_output_schema(self):
+        return [
+            OutputParameter(
+                name="images", param_type=OutputParameterType.OBJECT, is_array=True
+            ),  # The playlist images.,
+            OutputParameter(
+                name="url", param_type=OutputParameterType.STRING, is_array=False
+            ),  # The source URL of the image.,
+            OutputParameter(
+                name="height", param_type=OutputParameterType.INTEGER, is_array=False
+            ),  # The height of the image in pixels.,
+            OutputParameter(
+                name="width", param_type=OutputParameterType.INTEGER, is_array=False
+            ),  # The width of the image in pixels.
+        ]
+
+    def process(self, input_data: StandardInput) -> StandardOutput:
+        try:
+            out = self.api_config.request(
+                Get_a_Playlist_Cover_Image.method,
+                Get_a_Playlist_Cover_Image.url,
+                Get_a_Playlist_Cover_Image.args_in_url,
+                input_data.validated_data,
+            )
+            return StandardOutput(out, self.get_output_schema())
+        except Exception as e:
+            error_msg = f"Error running function 'Get_a_Playlist_Cover_Image': {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
 class Save_Episodes_for_Current_User(BaseFunction):
-    """Endpoint to save one or more episodes to the current user's library. Accepts either a comma-separated string in the 'ids' query parameter or a JSON array in the request body. The maximum number of IDs that can be sent in one request is 50."""
+    """Endpoint to save one or more episodes to the current user's library. Requires 'user-library-modify' scope."""
 
     name = "Save Episodes for Current User"
     url = "https://api.spotify.com/v1/me/episodes"
@@ -4037,30 +3936,30 @@ class Save_Episodes_for_Current_User(BaseFunction):
     method = "PUT"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="ids", param_type=ParameterType.STRING, required=True
-            ),  # A comma-separated list of the Spotify IDs. Maximum 50 IDs. Example: '77o6BIVlYM3msb4MMIL1jH,0Q86acNRm6V9GYx55SXKwf'.,
+            ),  # A comma-separated list of Spotify IDs to save. Maximum of 50 IDs. Example: `ids=77o6BIVlYM3msb4MMIL1jH,0Q86acNRm6V9GYx55SXKwf`.,
             Parameter(
-                name="body", param_type=OutputParameterType.OBJECT, required=True
-            ),  # JSON object containing an array 'ids' of Spotify IDs, max 50 items.
+                name="body", param_type=OutputParameterType.OBJECT, required=False
+            ),  # Supports additional optional properties, including 'ids' as an array of strings (overrides query parameter if both are present).
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
                 name="status_code",
-                param_type=OutputParameterType.STRING,
+                param_type=OutputParameterType.INTEGER,
                 is_array=False,
-            ),  # HTTP status code indicating the result (e.g., '200', '401', etc.).
+            ),  # HTTP status code indicating success or failure.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Save_Episodes_for_Current_User.method,
                 Save_Episodes_for_Current_User.url,
                 Save_Episodes_for_Current_User.args_in_url,
@@ -4076,7 +3975,7 @@ class Save_Episodes_for_Current_User(BaseFunction):
 
 
 class Get_an_Episode(BaseFunction):
-    """Retrieve detailed information about a specific episode by its Spotify ID, including metadata, images, and related show info."""
+    """Endpoint to retrieve detailed information about a specific episode identified by its Spotify ID."""
 
     name = "Get an Episode"
     url = "https://api.spotify.com/v1/episodes/{id}"
@@ -4084,16 +3983,16 @@ class Get_an_Episode(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="id", param_type=ParameterType.STRING, required=True
-            ),  # The Spotify ID for the episode. Example: '5Xt5DXGzch68nYYamXrNxZ'.,
+            ),  # The Spotify ID for the episode. Example: `512ojhOuo1ktJprKbVcKyQ`.,
             Parameter(
                 name="market", param_type=ParameterType.STRING, required=False
-            ),  # Optional country code (ISO 3166-1 alpha-2). Determines content availability based on market.
+            ),  # An ISO 3166-1 alpha-2 country code to filter content availability. If not specified, defaults to user country if access token is provided. Example: `ES`.
         ]
 
     def get_output_schema(self):
@@ -4102,65 +4001,65 @@ class Get_an_Episode(BaseFunction):
                 name="audio_preview_url",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # A URL to a 30 second preview (MP3 format) of the episode. Nullable and deprecated. Example: 'https://p.scdn.co/mp3-preview/2f37da1d4221f40b9d1a98cd191f4d6f1646ad17'.,
+            ),  # URL to a 30-second MP3 preview of the episode. Nullable; may be null if not available.,
             OutputParameter(
                 name="description",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # A description of the episode with HTML tags stripped. Use 'html_description' if HTML content is needed.,
+            ),  # Plain text description of the episode with HTML tags stripped.,
             OutputParameter(
                 name="html_description",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # A description of the episode, can contain HTML tags.,
+            ),  # HTML-formatted description of the episode.,
             OutputParameter(
                 name="duration_ms",
                 param_type=OutputParameterType.INTEGER,
                 is_array=False,
-            ),  # Length of the episode in milliseconds.,
+            ),  # Length of the episode in milliseconds. Example: 1686230.,
             OutputParameter(
                 name="explicit", param_type=OutputParameterType.BOOLEAN, is_array=False
-            ),  # Indicates whether the episode has explicit content.,
+            ),  # Indicates if the episode has explicit content.,
             OutputParameter(
                 name="external_urls",
                 param_type=OutputParameterType.OBJECT,
                 is_array=False,
-            ),  # External URLs related to the episode, e.g., Spotify URL.,
+            ),  # External URLs for this episode, including the Spotify URL.,
             OutputParameter(
                 name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to the API endpoint providing full details of the episode.,
+            ),  # Link to the Web API endpoint providing full details.,
             OutputParameter(
                 name="id", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The Spotify ID of the episode.,
+            ),  # Spotify ID for the episode.,
             OutputParameter(
                 name="images", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Array of images representing the episode cover art.,
+            ),  # Array of image objects representing cover art.,
             OutputParameter(
                 name="is_playable",
                 param_type=OutputParameterType.BOOLEAN,
                 is_array=False,
-            ),  # Indicates if the episode is playable in the given market.,
+            ),  # Whether the episode is playable in the given market.,
             OutputParameter(
                 name="languages", param_type=OutputParameterType.STRING, is_array=True
-            ),  # List of ISO 639-1 codes representing the languages used in the episode.,
+            ),  # List of ISO 639-1 language codes used in the episode.,
             OutputParameter(
                 name="name", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The name of the episode.,
+            ),  # Name of the episode.,
             OutputParameter(
                 name="release_date",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # The release date of the episode in 'YYYY-MM-DD' format.,
+            ),  # Release date in 'YYYY-MM-DD' format.,
             OutputParameter(
                 name="release_date_precision",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # Precision of the release date: 'year', 'month', or 'day'.,
+            ),  # Precision of release date: 'year', 'month', or 'day'.,
             OutputParameter(
                 name="resume_point",
                 param_type=OutputParameterType.OBJECT,
                 is_array=False,
-            ),  # User's most recent playback position in the episode, if available.,
+            ),  # User's most recent position in the episode, if scope allows.,
             OutputParameter(
                 name="type", param_type=OutputParameterType.STRING, is_array=False
             ),  # Object type, always 'episode'.,
@@ -4171,15 +4070,15 @@ class Get_an_Episode(BaseFunction):
                 name="restrictions",
                 param_type=OutputParameterType.OBJECT,
                 is_array=False,
-            ),  # Content restrictions if any, with reason.,
+            ),  # Content restrictions applied, if any.,
             OutputParameter(
                 name="show", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # Object representing the show the episode belongs to.
+            ),  # The show to which this episode belongs.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_an_Episode.method,
                 Get_an_Episode.url,
                 Get_an_Episode.args_in_url,
@@ -4192,16 +4091,256 @@ class Get_an_Episode(BaseFunction):
             raise ValueError(error_msg)
 
 
-class Get_the_current_users_profile(BaseFunction):
-    """"""
+class Get_a_Chapter(BaseFunction):
+    """Endpoint to fetch details about a specific audiobook chapter by its Spotify ID."""
 
-    name = "Get the current user's profile"
+    name = "Get a Chapter"
+    url = "https://api.spotify.com/v1/chapters/{id}"
+    args_in_url = True
+    method = "GET"
+
+    def __init__(self):
+        self.api_config = APIClientConfig()
+
+    def get_parameter_schema(self):
+        return [
+            Parameter(
+                name="id", param_type=ParameterType.STRING, required=True
+            ),  # The Spotify ID for the chapter. Example: `0D5wENdkdwbqlrHoaJ9g29`.,
+            Parameter(
+                name="market", param_type=ParameterType.STRING, required=False
+            ),  # ISO 3166-1 alpha-2 country code to filter content. If not specified, defaults to user country if access token is provided. Example: `ES`.
+        ]
+
+    def get_output_schema(self):
+        return [
+            OutputParameter(
+                name="audio_preview_url",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # URL to a 30-second MP3 preview of the chapter. Nullable; may be null if not available.,
+            OutputParameter(
+                name="available_markets",
+                param_type=OutputParameterType.STRING,
+                is_array=True,
+            ),  # Markets where the chapter can be played, specified as ISO 3166-1 alpha-2 codes.,
+            OutputParameter(
+                name="chapter_number",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Number of the chapter in the audiobook.,
+            OutputParameter(
+                name="description",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Plain text description with HTML tags stripped.,
+            OutputParameter(
+                name="html_description",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # HTML-formatted description of the chapter.,
+            OutputParameter(
+                name="duration_ms",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Length of the chapter in milliseconds.,
+            OutputParameter(
+                name="explicit", param_type=OutputParameterType.BOOLEAN, is_array=False
+            ),  # Whether the chapter contains explicit content.,
+            OutputParameter(
+                name="external_urls",
+                param_type=OutputParameterType.OBJECT,
+                is_array=False,
+            ),  # External URLs including the Spotify link.,
+            OutputParameter(
+                name="href", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Link to the Web API endpoint for full details.,
+            OutputParameter(
+                name="id", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Spotify ID for the chapter.,
+            OutputParameter(
+                name="images", param_type=OutputParameterType.OBJECT, is_array=True
+            ),  # Array of images representing cover art.,
+            OutputParameter(
+                name="is_playable",
+                param_type=OutputParameterType.BOOLEAN,
+                is_array=False,
+            ),  # Whether the chapter is playable in the current market.,
+            OutputParameter(
+                name="languages", param_type=OutputParameterType.STRING, is_array=True
+            ),  # List of ISO 639-1 language codes used in the chapter.,
+            OutputParameter(
+                name="name", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Name of the chapter.,
+            OutputParameter(
+                name="release_date",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Release date in 'YYYY-MM-DD' format.,
+            OutputParameter(
+                name="release_date_precision",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Precision: 'year', 'month', or 'day'.,
+            OutputParameter(
+                name="resume_point",
+                param_type=OutputParameterType.OBJECT,
+                is_array=False,
+            ),  # User's most recent position in the chapter.,
+            OutputParameter(
+                name="type", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Object type, always 'episode'.,
+            OutputParameter(
+                name="uri", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Spotify URI of the chapter.,
+            OutputParameter(
+                name="restrictions",
+                param_type=OutputParameterType.OBJECT,
+                is_array=False,
+            ),  # Content restrictions, if any.,
+            OutputParameter(
+                name="audiobook", param_type=OutputParameterType.OBJECT, is_array=False
+            ),  # The audiobook to which this chapter belongs.
+        ]
+
+    def process(self, input_data: StandardInput) -> StandardOutput:
+        try:
+            out = self.api_config.request(
+                Get_a_Chapter.method,
+                Get_a_Chapter.url,
+                Get_a_Chapter.args_in_url,
+                input_data.validated_data,
+            )
+            return StandardOutput(out, self.get_output_schema())
+        except Exception as e:
+            error_msg = f"Error running function 'Get_a_Chapter': {str(e)}"
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+
+class Get_Followed_Artists(BaseFunction):
+    """Endpoint to get the current user's followed artists, supports pagination."""
+
+    name = "Get Followed Artists"
+    url = "https://api.spotify.com/v1/me/following"
+    args_in_url = False
+    method = "GET"
+
+    def __init__(self):
+        self.api_config = APIClientConfig()
+
+    def get_parameter_schema(self):
+        return [
+            Parameter(
+                name="type", param_type=ParameterType.STRING, required=True
+            ),  # The ID type to fetch. Currently, only 'artist' is supported. Example: `type=artist`.,
+            Parameter(
+                name="after", param_type=ParameterType.STRING, required=False
+            ),  # The last artist ID retrieved from the previous request, for pagination. Example: `after=0I2XqVXqHScXjHhk6AYYRe`.,
+            Parameter(
+                name="limit", param_type=ParameterType.INTEGER, required=False
+            ),  # Maximum number of items to return. Default 20, min 1, max 50. Example: `limit=10`.
+        ]
+
+    def get_output_schema(self):
+        return [
+            OutputParameter(
+                name="artists", param_type=OutputParameterType.OBJECT, is_array=False
+            ),  # Paged set of followed artists.,
+            OutputParameter(
+                name="href", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Link to full result endpoint.,
+            OutputParameter(
+                name="limit", param_type=OutputParameterType.INTEGER, is_array=False
+            ),  # Maximum number of items in response.,
+            OutputParameter(
+                name="next", param_type=OutputParameterType.STRING, is_array=False
+            ),  # URL to next page, or null.,
+            OutputParameter(
+                name="cursors", param_type=OutputParameterType.OBJECT, is_array=True
+            ),  # Pagination cursors.,
+            OutputParameter(
+                name="total", param_type=OutputParameterType.INTEGER, is_array=False
+            ),  # Total followed artists.,
+            OutputParameter(
+                name="items", param_type=OutputParameterType.OBJECT, is_array=True
+            ),  # Array of artist objects.
+        ]
+
+    def process(self, input_data: StandardInput) -> StandardOutput:
+        try:
+            out = self.api_config.request(
+                Get_Followed_Artists.method,
+                Get_Followed_Artists.url,
+                Get_Followed_Artists.args_in_url,
+                input_data.validated_data,
+            )
+            return StandardOutput(out, self.get_output_schema())
+        except Exception as e:
+            error_msg = f"Error running function 'Get_Followed_Artists': {str(e)}"
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+
+class Get_Featured_Playlists(BaseFunction):
+    """Retrieves a list of Spotify's featured playlists with pagination and localization options."""
+
+    name = "Get Featured Playlists"
+    url = "https://api.spotify.com/v1/browse/featured-playlists"
+    args_in_url = False
+    method = "GET"
+
+    def __init__(self):
+        self.api_config = APIClientConfig()
+
+    def get_parameter_schema(self):
+        return [
+            Parameter(
+                name="locale", param_type=ParameterType.STRING, required=False
+            ),  # The desired language, consisting of an ISO 639-1 language code and an ISO 3166-1 alpha-2 country code, joined by an underscore. For example: 'es_MX'. If not supplied or unavailable, defaults to English.,
+            Parameter(
+                name="limit", param_type=ParameterType.INTEGER, required=False
+            ),  # Maximum number of items to return. Default: 20. Range: 1-50.,
+            Parameter(
+                name="offset", param_type=ParameterType.INTEGER, required=False
+            ),  # Index of the first item to return. Default: 0.
+        ]
+
+    def get_output_schema(self):
+        return [
+            OutputParameter(
+                name="message", param_type=OutputParameterType.STRING, is_array=False
+            ),  # The localized message of a playlist, e.g., 'Popular Playlists'.,
+            OutputParameter(
+                name="playlists", param_type=OutputParameterType.OBJECT, is_array=False
+            ),  # An object containing details of the playlists, including links, pagination info, and items.
+        ]
+
+    def process(self, input_data: StandardInput) -> StandardOutput:
+        try:
+            out = self.api_config.request(
+                Get_Featured_Playlists.method,
+                Get_Featured_Playlists.url,
+                Get_Featured_Playlists.args_in_url,
+                input_data.validated_data,
+            )
+            return StandardOutput(out, self.get_output_schema())
+        except Exception as e:
+            error_msg = f"Error running function 'Get_Featured_Playlists': {str(e)}"
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+
+class Get_Current_Users_Profile(BaseFunction):
+    """Retrieves detailed profile information about the current user, including settings and images."""
+
+    name = "Get Current User's Profile"
     url = "https://api.spotify.com/v1/me"
     args_in_url = False
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return []
@@ -4210,77 +4349,73 @@ class Get_the_current_users_profile(BaseFunction):
         return [
             OutputParameter(
                 name="country", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The country of the user, as set in the user's account profile. An ISO 3166-1 alpha-2 country code.,
+            ),  # User's country code as set in their profile; ISO 3166-1 alpha-2 code.,
             OutputParameter(
                 name="display_name",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # The name displayed on the user's profile. null if not available.,
+            ),  # Display name of the user, or null if not available.,
             OutputParameter(
                 name="email", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The user's email address, as entered by the user when creating their account. Important! This email address is unverified.,
+            ),  # User's email address, unverified, as entered during account creation.,
             OutputParameter(
                 name="explicit_content",
                 param_type=OutputParameterType.OBJECT,
                 is_array=False,
-            ),  # The user's explicit content settings.,
+            ),  # Content restrictions and explicit content settings.,
             OutputParameter(
                 name="external_urls",
                 param_type=OutputParameterType.OBJECT,
                 is_array=False,
-            ),  # Known external URLs for this user.,
+            ),  # Known external URLs for the user.,
             OutputParameter(
                 name="followers", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # Information about the followers of the user.,
+            ),  # Information about user followers.,
             OutputParameter(
                 name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # A link to the Web API endpoint for this user.,
+            ),  # Link to Web API endpoint for this user.,
             OutputParameter(
                 name="id", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The Spotify user ID for the user.,
+            ),  # Spotify's user ID.,
             OutputParameter(
                 name="images", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # The user's profile image.,
+            ),  # Profile images of the user.,
             OutputParameter(
                 name="product", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The user's Spotify subscription level: "premium", "free" etc.,
+            ),  # Subscription level, e.g., 'premium' or 'free'.,
             OutputParameter(
                 name="type", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The object type: 'user'.,
+            ),  # Object type, always 'user'.,
             OutputParameter(
                 name="uri", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The Spotify URI for the user.
+            ),  # Spotify URI for the user.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Get_the_current_users_profile.method,
-                Get_the_current_users_profile.url,
-                Get_the_current_users_profile.args_in_url,
+            out = self.api_config.request(
+                Get_Current_Users_Profile.method,
+                Get_Current_Users_Profile.url,
+                Get_Current_Users_Profile.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = (
-                f"Error running function 'Get_the_current_users_profile': {str(e)}"
-            )
+            error_msg = f"Error running function 'Get_Current_Users_Profile': {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
-class Get_a_list_of_the_albums_saved_in_the_current_Spotify_users_Your_Music_library(
-    BaseFunction
-):
-    """"""
+class Get_Users_Saved_Albums(BaseFunction):
+    """Fetches a paginated list of albums saved in the user's library, with optional market filtering."""
 
-    name = "Get a list of the albums saved in the current Spotify user’s ‘Your Music’ library"
+    name = "Get User's Saved Albums"
     url = "https://api.spotify.com/v1/me/albums"
     args_in_url = False
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
@@ -4292,100 +4427,51 @@ class Get_a_list_of_the_albums_saved_in_the_current_Spotify_users_Your_Music_lib
             ),  # The index of the first item to return. Default: 0.,
             Parameter(
                 name="market", param_type=ParameterType.STRING, required=False
-            ),  # An ISO 3166-1 alpha-2 country code. If specified, only content available in that market is returned.
+            ),  # ISO 3166-1 alpha-2 country code to filter content available in that market. If unspecified, user's market is used if available.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
                 name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # A link to the Web API endpoint returning the full result of the request.,
+            ),  # Link to the full result set.,
             OutputParameter(
                 name="limit", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Maximum number of items in the response.,
+            ),  # Maximum number of items returned.,
             OutputParameter(
-                name="next", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to the next page of items. null if none.,
+                name="next", param_type=OutputParameterType.STRING, is_array=True
+            ),  # URL to the next page of items, or null if none.,
             OutputParameter(
                 name="offset", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # The offset of the items returned.,
+            ),  # Starting index of the returned items.,
             OutputParameter(
-                name="previous", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to previous page of items. null if none.,
+                name="previous", param_type=OutputParameterType.STRING, is_array=True
+            ),  # URL to the previous page of items, or null if none.,
             OutputParameter(
                 name="total", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Total number of items available.,
+            ),  # Total number of saved albums.,
             OutputParameter(
                 name="items", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # An array of saved album objects.
+            ),  # Array of saved album objects, including added date and album info.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Get_a_list_of_the_albums_saved_in_the_current_Spotify_users_Your_Music_library.method,
-                Get_a_list_of_the_albums_saved_in_the_current_Spotify_users_Your_Music_library.url,
-                Get_a_list_of_the_albums_saved_in_the_current_Spotify_users_Your_Music_library.args_in_url,
+            out = self.api_config.request(
+                Get_Users_Saved_Albums.method,
+                Get_Users_Saved_Albums.url,
+                Get_Users_Saved_Albums.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = f"Error running function 'Get_a_list_of_the_albums_saved_in_the_current_Spotify_users_Your_Music_library': {str(e)}"
-            logging.error(error_msg)
-            raise ValueError(error_msg)
-
-
-class Get_Spotifys_list_of_featured_playlists(BaseFunction):
-    """"""
-
-    name = "Get Spotify's list of featured playlists"
-    url = "https://api.spotify.com/v1/browse/featured-playlists"
-    args_in_url = False
-    method = "GET"
-
-    def __init__(self):
-        self.api_wrapper = api_wrapper
-
-    def get_parameter_schema(self):
-        return [
-            Parameter(
-                name="locale", param_type=ParameterType.STRING, required=False
-            ),  # The desired language, ISO 639-1 code and ISO 3166-1 alpha-2 country code joined by an underscore, e.g., 'es_MX'. If not supplied, defaults to American English.,
-            Parameter(
-                name="limit", param_type=ParameterType.INTEGER, required=False
-            ),  # Maximum number of items to return. Default: 20. Range: 1-50.,
-            Parameter(
-                name="offset", param_type=ParameterType.INTEGER, required=False
-            ),  # The index of the first item to return. Default: 0.
-        ]
-
-    def get_output_schema(self):
-        return [
-            OutputParameter(
-                name="message", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The localized message of a playlist.,
-            OutputParameter(
-                name="playlists", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # A paged set of playlists.
-        ]
-
-    def process(self, input_data: StandardInput) -> StandardOutput:
-        try:
-            out = self.api_wrapper.request(
-                Get_Spotifys_list_of_featured_playlists.method,
-                Get_Spotifys_list_of_featured_playlists.url,
-                Get_Spotifys_list_of_featured_playlists.args_in_url,
-                input_data.validated_data,
-            )
-            return StandardOutput(out, self.get_output_schema())
-        except Exception as e:
-            error_msg = f"Error running function 'Get_Spotifys_list_of_featured_playlists': {str(e)}"
+            error_msg = f"Error running function 'Get_Users_Saved_Albums': {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
 class Get_Album(BaseFunction):
-    """Get detailed information about a specific album by Spotify ID."""
+    """Retrieve detailed information about a specific album by its Spotify ID."""
 
     name = "Get Album"
     url = "https://api.spotify.com/v1/albums/{id}"
@@ -4393,7 +4479,7 @@ class Get_Album(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
@@ -4402,38 +4488,38 @@ class Get_Album(BaseFunction):
             ),  # The Spotify ID of the album. Example: '4aawyAB9vmqN3uQ7FjRGTy'.,
             Parameter(
                 name="market", param_type=ParameterType.STRING, required=False
-            ),  # An ISO 3166-1 alpha-2 country code. Specifies the market in which to return content. Example: 'ES'. If not provided, defaults to user's country if access token is provided.
+            ),  # An ISO 3166-1 alpha-2 country code to specify the market for album availability. Example: 'ES'. If not provided, defaults to the country associated with the user or request.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
                 name="album_type", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The type of the album. Allowed values: 'album', 'single', 'compilation'.,
+            ),  # Required. The type of the album. Allowed values: 'album', 'single', 'compilation'.,
             OutputParameter(
                 name="total_tracks",
                 param_type=OutputParameterType.INTEGER,
                 is_array=False,
-            ),  # The number of tracks in the album.,
+            ),  # Required. The number of tracks in the album.,
             OutputParameter(
                 name="available_markets",
                 param_type=OutputParameterType.STRING,
                 is_array=True,
-            ),  # Markets where the album is available, specified by ISO 3166-1 alpha-2 codes. Example: ['CA','BR','IT'].,
+            ),  # Required. List of markets where the album is available. ISO 3166-1 alpha-2 country codes. Example: ['CA','BR','IT'].,
             OutputParameter(
                 name="external_urls",
                 param_type=OutputParameterType.OBJECT,
                 is_array=False,
-            ),  # Known external URLs for this album, contains 'spotify' string.,
+            ),  # Required. External URLs for the album, including 'spotify'.,
             OutputParameter(
                 name="href", param_type=OutputParameterType.STRING, is_array=False
             ),  # Link to the Web API endpoint providing full details of the album.,
             OutputParameter(
                 name="id", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The Spotify ID of the album. Example: '2up3OPMp9Tb4dAKM2erWXQ'.,
+            ),  # Spotify ID for the album. Example: '2up3OPMp9Tb4dAKM2erWXQ'.,
             OutputParameter(
                 name="images", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # The cover art in various sizes.,
+            ),  # Album cover images in various sizes.,
             OutputParameter(
                 name="name", param_type=OutputParameterType.STRING, is_array=False
             ),  # The name of the album.,
@@ -4441,53 +4527,53 @@ class Get_Album(BaseFunction):
                 name="release_date",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # The release date of the album. Format varies by 'release_date_precision'.,
+            ),  # The date the album was first released. Example: '1981-12'.,
             OutputParameter(
                 name="release_date_precision",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # Precision of 'release_date'. Allowed values: 'year', 'month', 'day'.,
+            ),  # The precision of the release date. Allowed values: 'year', 'month', 'day'.,
             OutputParameter(
                 name="restrictions",
                 param_type=OutputParameterType.OBJECT,
                 is_array=False,
-            ),  # Content restrictions, if any, includes 'reason' field.,
+            ),  # Content restrictions applied to the album.,
             OutputParameter(
                 name="type", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Object type: 'album'.,
+            ),  # Object type. Allowed value: 'album'.,
             OutputParameter(
                 name="uri", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify URI of the album, e.g., 'spotify:album:...'.,
+            ),  # Spotify URI for the album. Example: 'spotify:album:...'.,
             OutputParameter(
                 name="artists", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Artists of the album.,
+            ),  # List of artists of the album.,
             OutputParameter(
                 name="tracks", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # Tracks in the album, with 'href', 'limit', 'next', 'offset', 'previous', 'total', 'items'.,
+            ),  # Tracks in the album, includes paging information and list of track objects.,
             OutputParameter(
                 name="copyrights", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Copyright statements.,
+            ),  # Copyright statements of the album.,
             OutputParameter(
                 name="external_ids",
                 param_type=OutputParameterType.OBJECT,
                 is_array=False,
-            ),  # External identifiers like ISRC, EAN, UPC.,
+            ),  # External IDs such as ISRC, EAN, UPC.,
             OutputParameter(
                 name="genres", param_type=OutputParameterType.STRING, is_array=True
-            ),  # (Deprecated) always empty array.,
+            ),  # (Deprecated) This field is always empty.,
             OutputParameter(
                 name="label", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Label associated with the album.,
+            ),  # The label of the album.,
             OutputParameter(
                 name="popularity",
                 param_type=OutputParameterType.INTEGER,
                 is_array=False,
-            ),  # Popularity score between 0 and 100.
+            ),  # The popularity of the album, a value between 0 and 100.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_Album.method,
                 Get_Album.url,
                 Get_Album.args_in_url,
@@ -4500,16 +4586,16 @@ class Get_Album(BaseFunction):
             raise ValueError(error_msg)
 
 
-class Reorder_or_replace_playlist_tracks(BaseFunction):
-    """Reorder or replace tracks in a playlist. Use 'uris' to replace tracks, or 'range_start', 'insert_before', and 'range_length' to reorder."""
+class Update_Playlist_Items(BaseFunction):
+    """Reorder or replace items in a playlist depending on parameters provided."""
 
-    name = "Reorder or replace playlist tracks"
+    name = "Update Playlist Items"
     url = "https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
     args_in_url = True
     method = "PUT"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
@@ -4518,19 +4604,10 @@ class Reorder_or_replace_playlist_tracks(BaseFunction):
             ),  # The Spotify ID of the playlist. Example: '3cEYpjA9oz9GiPac4AsH4n'.,
             Parameter(
                 name="uris", param_type=ParameterType.STRING, required=False
-            ),  # Comma-separated list of Spotify URIs to add (for replacing tracks). Example: 'spotify:track:...'. Max 100 items.,
+            ),  # A comma-separated list of Spotify URIs to set in the playlist (either tracks or episodes). Example: 'spotify:track:...,spotify:episode:...'. Max 100 items.,
             Parameter(
-                name="range_start", param_type=ParameterType.INTEGER, required=False
-            ),  # Position of the first item to be reordered.,
-            Parameter(
-                name="insert_before", param_type=ParameterType.INTEGER, required=False
-            ),  # Position where the items should be inserted.,
-            Parameter(
-                name="range_length", param_type=ParameterType.INTEGER, required=False
-            ),  # Number of items to move starting from 'range_start'. Defaults to 1.,
-            Parameter(
-                name="snapshot_id", param_type=ParameterType.STRING, required=False
-            ),  # The playlist's snapshot ID for concurrency control.
+                name="body", param_type=OutputParameterType.OBJECT, required=False
+            ),  # Request body containing 'uris' as an array of strings, 'range_start' as integer, 'insert_before' as integer, 'range_length' as integer, 'snapshot_id' as string. Supports reordering or replacing playlist items.
         ]
 
     def get_output_schema(self):
@@ -4539,28 +4616,26 @@ class Reorder_or_replace_playlist_tracks(BaseFunction):
                 name="snapshot_id",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # A Snapshot ID for the playlist after the operation, e.g., 'abc'.
+            ),  # A snapshot ID for the playlist after changes. Example: 'abc'.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Reorder_or_replace_playlist_tracks.method,
-                Reorder_or_replace_playlist_tracks.url,
-                Reorder_or_replace_playlist_tracks.args_in_url,
+            out = self.api_config.request(
+                Update_Playlist_Items.method,
+                Update_Playlist_Items.url,
+                Update_Playlist_Items.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = (
-                f"Error running function 'Reorder_or_replace_playlist_tracks': {str(e)}"
-            )
+            error_msg = f"Error running function 'Update_Playlist_Items': {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
 class Spotify_URIs_and_IDs(BaseFunction):
-    """Provides the standard Spotify URIs and IDs for resources like tracks, artists, albums, categories, and users."""
+    """Different resource identifiers and URLs used within Spotify's API for various resources."""
 
     name = "Spotify URIs and IDs"
     url = (
@@ -4570,7 +4645,7 @@ class Spotify_URIs_and_IDs(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return []
@@ -4581,30 +4656,30 @@ class Spotify_URIs_and_IDs(BaseFunction):
                 name="spotify_uri",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # Resource identifier for entities like artist, album, or track. Example: 'spotify:track:6rqhFgbbKwnb9MLmUQDhG6'.,
+            ),  # The resource identifier of an artist, album, or track. Example: 'spotify:track:6rqhFgbbKwnb9MLmUQDhG6'.,
             OutputParameter(
                 name="spotify_id", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Base62 identifier found at the end of the URI. Example: '6rqhFgbbKwnb9MLmUQDhG6'.,
+            ),  # The base-62 identifier found at the end of a Spotify URI. Example: '6rqhFgbbKwnb9MLmUQDhG6'.,
             OutputParameter(
                 name="spotify_category_id",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # Unique string for Spotify category. Example: 'party'.,
+            ),  # The unique string for a Spotify category. Example: 'party'.,
             OutputParameter(
                 name="spotify_user_id",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # Unique string for Spotify user ID. Example: 'wizzler'.,
+            ),  # The Spotify user ID. Example: 'wizzler'.,
             OutputParameter(
                 name="spotify_url",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # URL to open resource in Spotify client. Example: 'http://open.spotify.com/track/6rqhFgbbKwnb9MLmUQDhG6'.
+            ),  # A URL that opens in the Spotify client or web player. Example: 'http://open.spotify.com/track/...'.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Spotify_URIs_and_IDs.method,
                 Spotify_URIs_and_IDs.url,
                 Spotify_URIs_and_IDs.args_in_url,
@@ -4618,7 +4693,7 @@ class Spotify_URIs_and_IDs(BaseFunction):
 
 
 class Get_Playlist(BaseFunction):
-    """Retrieve full details of a playlist owned by a Spotify user."""
+    """Get detailed information about a specific playlist by its ID."""
 
     name = "Get Playlist"
     url = "https://api.spotify.com/v1/playlists/{playlist_id}"
@@ -4626,22 +4701,22 @@ class Get_Playlist(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="playlist_id", param_type=ParameterType.STRING, required=True
-            ),  # The Spotify ID of the playlist. Example: '3cEYpjA9oz9GiPac4AsH4n'.,
+            ),  # The Spotify ID of the playlist. Example: `3cEYpjA9oz9GiPac4AsH4n`,
             Parameter(
                 name="market", param_type=ParameterType.STRING, required=False
-            ),  # An ISO 3166-1 alpha-2 country code. Content available in this market will be returned. If a user access token is provided, the user's country takes priority. No value or null indicates content is unavailable.,
+            ),  # ISO 3166-1 alpha-2 country code. If specified, only content available in that market will be returned. If a user access token is provided, the user's country is used instead. Example: `ES`,
             Parameter(
                 name="fields", param_type=ParameterType.STRING, required=False
-            ),  # Comma-separated list of fields to return, supports dot notation and parentheses for nested fields. Example: 'description,uri'.,
+            ),  # Comma-separated list of fields to return. Supports nested fields with dot notation and parentheses, e.g., `tracks.items(added_at,added_by.id)`. Use '!' prefix to exclude fields, e.g., `tracks.items(track(name,href))`. Example: `items(added_by.id,track(name,href))`,
             Parameter(
                 name="additional_types", param_type=ParameterType.STRING, required=False
-            ),  # Comma-separated list of item types besides 'track', valid values are 'track' and 'episode'.
+            ),  # Comma-separated list of item types supporting besides 'track' and 'episode', e.g., `track,episode`. Note: this parameter might be deprecated.
         ]
 
     def get_output_schema(self):
@@ -4650,46 +4725,46 @@ class Get_Playlist(BaseFunction):
                 name="collaborative",
                 param_type=OutputParameterType.BOOLEAN,
                 is_array=False,
-            ),  # True if the owner allows other users to modify the playlist.,
+            ),  # True if owners allow other users to modify the playlist.,
             OutputParameter(
                 name="description",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # The playlist description. Nullable; null if not available.,
+            ),  # The playlist description, nullable. Only returned for modified, verified playlists; otherwise null.,
             OutputParameter(
                 name="external_urls",
                 param_type=OutputParameterType.OBJECT,
                 is_array=False,
-            ),  # Known external URLs for the playlist. Contains 'spotify' string.,
+            ),  # Known external URLs for the playlist, e.g., Spotify URL.,
             OutputParameter(
                 name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Link to the Web API endpoint for full playlist details.,
+            ),  # Link to Web API endpoint providing full playlist details.,
             OutputParameter(
                 name="id", param_type=OutputParameterType.STRING, is_array=False
             ),  # The Spotify ID for the playlist.,
             OutputParameter(
                 name="images", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Images for the playlist, up to three, ordered by size. Each contains 'url', 'height', and 'width'.,
+            ),  # Array of image objects for the playlist, up to three images, sorted by size descending.,
             OutputParameter(
                 name="name", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The name of the playlist.,
+            ),  # Name of the playlist.,
             OutputParameter(
                 name="owner", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # User who owns the playlist, contains 'external_urls', 'href', 'id', 'type', 'uri', 'display_name'.,
+            ),  # The owner of the playlist, including external URLs, href, id, type, uri, display name.,
             OutputParameter(
                 name="public", param_type=OutputParameterType.BOOLEAN, is_array=False
-            ),  # The playlist's public/private status; true, false, or null.,
+            ),  # The playlist's public/private status; true if public, false if private, null if not relevant.,
             OutputParameter(
                 name="snapshot_id",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # Playlist version identifier.,
+            ),  # Snapshot ID of the playlist for version control.,
             OutputParameter(
                 name="tracks", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # Details about the tracks, including 'href', 'limit', 'next', 'offset', 'previous', 'total', 'items'.,
+            ),  # Object containing playlist tracks, including href, limit, next, offset, previous, total, and items array.,
             OutputParameter(
                 name="type", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Object type: 'playlist'.,
+            ),  # The object type: 'playlist'.,
             OutputParameter(
                 name="uri", param_type=OutputParameterType.STRING, is_array=False
             ),  # The Spotify URI for the playlist.
@@ -4697,7 +4772,7 @@ class Get_Playlist(BaseFunction):
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_Playlist.method,
                 Get_Playlist.url,
                 Get_Playlist.args_in_url,
@@ -4710,28 +4785,31 @@ class Get_Playlist(BaseFunction):
             raise ValueError(error_msg)
 
 
-class Add_Items_to_Playlist(BaseFunction):
-    """Add one or more items to a user's playlist, responding with a snapshot ID."""
+class Add_Tracks_to_Playlist(BaseFunction):
+    """Add one or more tracks or episodes to a playlist at optional position."""
 
-    name = "Add Items to Playlist"
+    name = "Add Tracks to Playlist"
     url = "https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
     args_in_url = True
     method = "PUT"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="playlist_id", param_type=ParameterType.STRING, required=True
-            ),  # The Spotify ID of the playlist.,
+            ),  # The Spotify ID of the playlist to add tracks to. Example: `3cEYpjA9oz9GiPac4AsH4n`,
             Parameter(
                 name="position", param_type=ParameterType.INTEGER, required=False
-            ),  # Zero-based index to insert items at. Defaults to appending if omitted.,
+            ),  # The position to insert the items, zero-based index. Defaults to appending at the end if omitted. Example: `0`.,
             Parameter(
                 name="uris", param_type=ParameterType.STRING, required=False
-            ),  # Comma-separated list of Spotify URIs to add, e.g., 'spotify:track:...' or 'spotify:episode:...'. Support up to 100 items; recommended to send as JSON array in body.
+            ),  # Comma-separated list of Spotify URIs (track or episode) to add, e.g., `spotify:track:4iV5W9uYEdYUVa79Axb7Rh`. Max 100 items. Note: for large sets, pass as JSON array in request body.,
+            Parameter(
+                name="body", param_type=OutputParameterType.OBJECT, required=False
+            ),  # Request body supporting 'uris' as an array of strings and optional 'position'.
         ]
 
     def get_output_schema(self):
@@ -4740,55 +4818,58 @@ class Add_Items_to_Playlist(BaseFunction):
                 name="snapshot_id",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # A snapshot ID for the playlist after addition.
+            ),  # Snapshot ID of the playlist after modification.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Add_Items_to_Playlist.method,
-                Add_Items_to_Playlist.url,
-                Add_Items_to_Playlist.args_in_url,
+            out = self.api_config.request(
+                Add_Tracks_to_Playlist.method,
+                Add_Tracks_to_Playlist.url,
+                Add_Tracks_to_Playlist.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = f"Error running function 'Add_Items_to_Playlist': {str(e)}"
+            error_msg = f"Error running function 'Add_Tracks_to_Playlist': {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
 class Follow_Artists_or_Users(BaseFunction):
-    """Follow one or more artists or users, adding the current user as a follower, requiring 'user-follow-modify' scope."""
+    """Add current user as follower of specified artists or other Spotify users."""
 
     name = "Follow Artists or Users"
     url = "https://api.spotify.com/v1/me/following?type={type}"
-    args_in_url = False
+    args_in_url = True
     method = "PUT"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="type", param_type=ParameterType.STRING, required=True
-            ),  # The ID type. Allowed values: 'artist' or 'user'.,
+            ),  # The ID type: 'artist' or 'user'.,
             Parameter(
                 name="ids", param_type=ParameterType.STRING, required=True
-            ),  # Comma-separated list of Spotify IDs (max 50). Alternatively, provide JSON array in body.
+            ),  # Comma-separated list of Spotify IDs (max 50) of artists or users to follow. Example: `2CIMQHirSU0MQqyYHq0eOx,57dN52uHvrHOxijzpIgu3E`,
+            Parameter(
+                name="body", param_type=OutputParameterType.OBJECT, required=False
+            ),  # Request body supporting 'ids' as an array of strings of Spotify IDs, maximum 50, e.g., `{'ids': ['id1', 'id2']}`.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
                 name="status", param_type=OutputParameterType.STRING, is_array=False
-            ),  # HTTP response status indicating success or failure.
+            ),  # Empty response on success, status codes indicate the result.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Follow_Artists_or_Users.method,
                 Follow_Artists_or_Users.url,
                 Follow_Artists_or_Users.args_in_url,
@@ -4801,25 +4882,25 @@ class Follow_Artists_or_Users(BaseFunction):
             raise ValueError(error_msg)
 
 
-class Remove_users_saved_tracks(BaseFunction):
-    """Deletes one or more tracks from the current user's 'Your Music' library using either the comma-separated string or array format for IDs."""
+class Remove_Users_Saved_Tracks(BaseFunction):
+    """Removes one or more tracks from the current user's 'Your Music' library."""
 
-    name = "Remove user's saved tracks"
+    name = "Remove User's Saved Tracks"
     url = "https://api.spotify.com/v1/me/tracks"
     args_in_url = False
     method = "DELETE"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="ids", param_type=ParameterType.STRING, required=True
-            ),  # A comma-separated list of Spotify IDs for the tracks to remove. Maximum: 50 IDs. Example: '7ouMYWpwJ422jRcDASZB7P,4VqPOruhp5EdPBeR92t6lQ'.,
+            ),  # A comma-separated list of the Spotify IDs for the tracks to remove. For example: '4iV5W9uYEdYUVa79Axb7Rh,1301WleyT98MSxVHPZCA6M'. Maximum: 50 IDs.,
             Parameter(
-                name="ids", param_type=ParameterType.STRING, required=True
-            ),  # An array of Spotify track IDs, up to 50 items. Example: ['7ouMYWpwJ422jRcDASZB7P', '4VqPOruhp5EdPBeR92t6lQ']
+                name="ids", param_type=ParameterType.STRING, required=False
+            ),  # An array of strings representing Spotify IDs. For example: ['7ouMYWpwJ422jRcDASZB7P', '4VqPOruhp5EdPBeR92t6lQ']. A maximum of 50 items can be specified in one request. If both 'ids' query parameter and this body property are present, the body property will be ignored.
         ]
 
     def get_output_schema(self):
@@ -4827,29 +4908,29 @@ class Remove_users_saved_tracks(BaseFunction):
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Remove_users_saved_tracks.method,
-                Remove_users_saved_tracks.url,
-                Remove_users_saved_tracks.args_in_url,
+            out = self.api_config.request(
+                Remove_Users_Saved_Tracks.method,
+                Remove_Users_Saved_Tracks.url,
+                Remove_Users_Saved_Tracks.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = f"Error running function 'Remove_users_saved_tracks': {str(e)}"
+            error_msg = f"Error running function 'Remove_Users_Saved_Tracks': {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
-class Get_audio_features_for_a_track(BaseFunction):
-    """Retrieves audio features for a specific track identified by its Spotify ID, providing a detailed audio analysis."""
+class Get_Tracks_Audio_Features(BaseFunction):
+    """Get audio feature information for a single track identified by its Spotify ID."""
 
-    name = "Get audio features for a track"
+    name = "Get Track's Audio Features"
     url = "https://api.spotify.com/v1/audio-features/{id}"
     args_in_url = True
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
@@ -4864,109 +4945,174 @@ class Get_audio_features_for_a_track(BaseFunction):
                 name="acousticness",
                 param_type=OutputParameterType.FLOAT,
                 is_array=False,
-            ),  # Confidence measure from 0.0 to 1.0 of whether the track is acoustic. E.g., 0.00242.,
+            ),  # A confidence measure from 0.0 to 1.0 of whether the track is acoustic. 1.0 represents high confidence the track is acoustic.,
             OutputParameter(
                 name="analysis_url",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # URL to access the full audio analysis, requires an access token. Example: 'https://api.spotify.com/v1/audio-analysis/2takcwOaAZWiXQijPHIx7B'.,
+            ),  # A URL to access the full audio analysis of this track. An access token is required to access this data.,
             OutputParameter(
                 name="danceability",
                 param_type=OutputParameterType.FLOAT,
                 is_array=False,
-            ),  # Describes how suitable the track is for dancing, from 0.0 (least danceable) to 1.0 (most danceable). Example: 0.585.,
+            ),  # Danceability describes how suitable a track is for dancing based on a combination of musical elements, ranging from 0.0 to 1.0.,
             OutputParameter(
                 name="duration_ms",
                 param_type=OutputParameterType.INTEGER,
                 is_array=False,
-            ),  # Length of the track in milliseconds. Example: 237040.,
+            ),  # The duration of the track in milliseconds.,
             OutputParameter(
                 name="energy", param_type=OutputParameterType.FLOAT, is_array=False
-            ),  # Perceptual measure from 0.0 to 1.0 of intensity and activity. Example: 0.842.,
+            ),  # A measure from 0.0 to 1.0 of perceptual measure of intensity and activity.,
             OutputParameter(
                 name="id", param_type=OutputParameterType.STRING, is_array=False
-            ),  # The Spotify ID for the track. Example: '2takcwOaAZWiXQijPHIx7B'.,
+            ),  # The Spotify ID for the track.,
             OutputParameter(
                 name="instrumentalness",
                 param_type=OutputParameterType.FLOAT,
                 is_array=False,
-            ),  # Predicts likelihood of no vocals, from 0.0 to 1.0. Example: 0.00686.,
+            ),  # Predicts whether a track contains no vocals, with values closer to 1.0 indicating a higher likelihood of being purely instrumental.,
             OutputParameter(
                 name="key", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # The key the track is in, from -1 (no key detected) to 11, using Pitch Class notation. Example: 9.,
+            ),  # The key the track is in, represented as an integer from -1 to 11, following the Pitch Class notation.,
             OutputParameter(
                 name="liveness", param_type=OutputParameterType.FLOAT, is_array=False
-            ),  # Detects presence of audience, from 0.0 to 1.0. Example: 0.0866.,
+            ),  # Detects the presence of an audience in the recording, with higher values indicating a higher probability that the track was performed live.,
             OutputParameter(
                 name="loudness", param_type=OutputParameterType.FLOAT, is_array=False
-            ),  # Overall loudness in decibels. Example: -5.883.,
+            ),  # The overall loudness of the track in decibels (dB). Usually between -60 and 0.,
             OutputParameter(
                 name="mode", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Modal scale, 1 for major, 0 for minor. Example: 0.,
+            ),  # The modality (major or minor) of the track, 1 for major, 0 for minor.,
             OutputParameter(
                 name="speechiness", param_type=OutputParameterType.FLOAT, is_array=False
-            ),  # Detects presence of spoken words, from 0.0 to 1.0. Example: 0.0556.,
+            ),  # Detects the presence of spoken words in a track, with values above 0.66 indicating likely speech content.,
             OutputParameter(
                 name="tempo", param_type=OutputParameterType.FLOAT, is_array=False
-            ),  # Estimated tempo in beats per minute. Example: 118.211.,
+            ),  # The estimated tempo of the track in beats per minute (BPM).,
             OutputParameter(
                 name="time_signature",
                 param_type=OutputParameterType.INTEGER,
                 is_array=False,
-            ),  # Estimated time signature, from 3 to 7. Example: 4.,
+            ),  # An estimated time signature, range from 3 to 7.,
             OutputParameter(
                 name="track_href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Link to the Web API endpoint for full track details. Example: 'https://api.spotify.com/v1/tracks/2takcwOaAZWiXQijPHIx7B'.,
+            ),  # A URL to access full details of the track via the Web API.,
             OutputParameter(
                 name="type", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Object type, fixed value: 'audio_features'.,
+            ),  # The object type, always 'audio_features'.,
             OutputParameter(
                 name="uri", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify URI for the track. Example: 'spotify:track:2takcwOaAZWiXQijPHIx7B'.,
+            ),  # The Spotify URI for the track.,
             OutputParameter(
                 name="valence", param_type=OutputParameterType.FLOAT, is_array=False
-            ),  # Musical positiveness measure, from 0.0 (negative) to 1.0 (positive). Example: 0.428.
+            ),  # A measure from 0.0 to 1.0 representing the musical positiveness conveyed by the track.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Get_audio_features_for_a_track.method,
-                Get_audio_features_for_a_track.url,
-                Get_audio_features_for_a_track.args_in_url,
+            out = self.api_config.request(
+                Get_Tracks_Audio_Features.method,
+                Get_Tracks_Audio_Features.url,
+                Get_Tracks_Audio_Features.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = (
-                f"Error running function 'Get_audio_features_for_a_track': {str(e)}"
-            )
+            error_msg = f"Error running function 'Get_Tracks_Audio_Features': {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
-class Get_users_top_artists_or_tracks(BaseFunction):
-    """Retrieves the current user's most played artists or tracks over a specified time period, limited to 50 items."""
+class Get_Users_Top_Items(BaseFunction):
+    """Get the current user's top artists or tracks based on affinity over a specified time frame."""
 
-    name = "Get user's top artists or tracks"
+    name = "Get User's Top Items"
     url = "https://api.spotify.com/v1/me/top/{type}"
     args_in_url = True
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="type", param_type=ParameterType.STRING, required=True
-            ),  # The type of entity to return: 'artists' or 'tracks'. Allowed values: 'artists', 'tracks'.,
+            ),  # The type of item to return. Valid values: 'artists' or 'tracks'.,
             Parameter(
                 name="time_range", param_type=ParameterType.STRING, required=False
-            ),  # Time frame for the data: 'long_term', 'medium_term', 'short_term'. Defaults to 'medium_term'.,
+            ),  # Over what time period the affinities are computed. Valid values: 'long_term', 'medium_term', 'short_term'. Default: 'medium_term'.,
             Parameter(
                 name="limit", param_type=ParameterType.INTEGER, required=False
-            ),  # Maximum number of items to return, between 1 and 50. Default: 20.,
+            ),  # Maximum number of items to return. Default: 20, min: 1, max: 50.,
+            Parameter(
+                name="offset", param_type=ParameterType.INTEGER, required=False
+            ),  # The index of the first item to return. Default: 0.
+        ]
+
+    def get_output_schema(self):
+        return [
+            OutputParameter(
+                name="href", param_type=OutputParameterType.STRING, is_array=False
+            ),  # A link to the API endpoint returning the full result of the request.,
+            OutputParameter(
+                name="limit", param_type=OutputParameterType.INTEGER, is_array=False
+            ),  # Maximum number of items returned.,
+            OutputParameter(
+                name="next", param_type=OutputParameterType.STRING, is_array=False
+            ),  # URL to the next page of items, or null.,
+            OutputParameter(
+                name="offset", param_type=OutputParameterType.INTEGER, is_array=False
+            ),  # The offset of the items returned.,
+            OutputParameter(
+                name="previous", param_type=OutputParameterType.STRING, is_array=False
+            ),  # URL to the previous page of items, or null.,
+            OutputParameter(
+                name="total", param_type=OutputParameterType.INTEGER, is_array=False
+            ),  # The total number of items available.,
+            OutputParameter(
+                name="items", param_type=OutputParameterType.OBJECT, is_array=True
+            ),  # An array of artist or track objects, each with their own detailed schema.
+        ]
+
+    def process(self, input_data: StandardInput) -> StandardOutput:
+        try:
+            out = self.api_config.request(
+                Get_Users_Top_Items.method,
+                Get_Users_Top_Items.url,
+                Get_Users_Top_Items.args_in_url,
+                input_data.validated_data,
+            )
+            return StandardOutput(out, self.get_output_schema())
+        except Exception as e:
+            error_msg = f"Error running function 'Get_Users_Top_Items': {str(e)}"
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+
+class Get_a_Chapter(BaseFunction):
+    """Retrieve information about one or multiple audiobook chapters, with optional filtering by market and pagination."""
+
+    name = "Get a Chapter"
+    url = "/audiobooks/{id}/chapters"
+    args_in_url = True
+    method = "GET"
+
+    def __init__(self):
+        self.api_config = APIClientConfig()
+
+    def get_parameter_schema(self):
+        return [
+            Parameter(
+                name="id", param_type=ParameterType.STRING, required=True
+            ),  # The Spotify ID of the audiobook chapter. Example: '7iHfbu1YPACw6oZPAFJtqe'.,
+            Parameter(
+                name="market", param_type=ParameterType.STRING, required=False
+            ),  # ISO 3166-1 alpha-2 country code. If specified, only content available in that market will be returned. Example: 'ES'.,
+            Parameter(
+                name="limit", param_type=ParameterType.INTEGER, required=False
+            ),  # Maximum number of items to return. Default: 20. Min: 1. Max: 50.,
             Parameter(
                 name="offset", param_type=ParameterType.INTEGER, required=False
             ),  # Index of the first item to return. Default: 0.
@@ -4976,130 +5122,61 @@ class Get_users_top_artists_or_tracks(BaseFunction):
         return [
             OutputParameter(
                 name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Link to the full result set. Example: 'https://api.spotify.com/v1/me/shows?offset=0&limit=20'.,
+            ),  # Link to the Web API endpoint returning the full result.,
             OutputParameter(
                 name="limit", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Number of items in the response, as set in the query.,
+            ),  # Maximum number of items in the response.,
             OutputParameter(
                 name="next", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to next page, or null if none.,
+            ),  # URL to the next page of items, or null if none.,
             OutputParameter(
                 name="offset", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Index of the first item in the returned page.,
+            ),  # Offset of the items returned.,
             OutputParameter(
                 name="previous", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to previous page, or null if none.,
+            ),  # URL to the previous page of items, or null if none.,
             OutputParameter(
                 name="total", param_type=OutputParameterType.INTEGER, is_array=False
             ),  # Total number of items available.,
             OutputParameter(
-                name="items", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Array of artist or track objects.
-        ]
-
-    def process(self, input_data: StandardInput) -> StandardOutput:
-        try:
-            out = self.api_wrapper.request(
-                Get_users_top_artists_or_tracks.method,
-                Get_users_top_artists_or_tracks.url,
-                Get_users_top_artists_or_tracks.args_in_url,
-                input_data.validated_data,
-            )
-            return StandardOutput(out, self.get_output_schema())
-        except Exception as e:
-            error_msg = (
-                f"Error running function 'Get_users_top_artists_or_tracks': {str(e)}"
-            )
-            logging.error(error_msg)
-            raise ValueError(error_msg)
-
-
-class Get_Audiobook_Chapters(BaseFunction):
-    """Retrieve audiobook chapters with pagination support."""
-
-    name = "Get Audiobook Chapters"
-    url = "https://api.spotify.com/v1/audiobooks/{id}/chapters"
-    args_in_url = True
-    method = "GET"
-
-    def __init__(self):
-        self.api_wrapper = api_wrapper
-
-    def get_parameter_schema(self):
-        return [
-            Parameter(
-                name="id", param_type=ParameterType.STRING, required=True
-            ),  # The Spotify ID of the audiobook.,
-            Parameter(
-                name="market", param_type=ParameterType.STRING, required=False
-            ),  # ISO 3166-1 alpha-2 country code. If specified, only content available in that market will be returned.,
-            Parameter(
-                name="limit", param_type=ParameterType.INTEGER, required=False
-            ),  # Maximum number of items to return. Default is 20. Range: 1-50.,
-            Parameter(
-                name="offset", param_type=ParameterType.INTEGER, required=False
-            ),  # Index of the first item to return. Default is 0.
-        ]
-
-    def get_output_schema(self):
-        return [
-            OutputParameter(
-                name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Link to the Web API endpoint returning full results.,
-            OutputParameter(
-                name="limit", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Maximum number of items in response.,
-            OutputParameter(
-                name="next", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to next page of items, or null if none.,
-            OutputParameter(
-                name="offset", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Offset of the first item returned.,
-            OutputParameter(
-                name="previous", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to previous page of items, or null if none.,
-            OutputParameter(
-                name="total", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Total number of items available.,
-            OutputParameter(
-                name="items", param_type=OutputParameterType.OBJECT, is_array=True
+                name="chapters", param_type=OutputParameterType.OBJECT, is_array=True
             ),  # Array of chapter objects.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Get_Audiobook_Chapters.method,
-                Get_Audiobook_Chapters.url,
-                Get_Audiobook_Chapters.args_in_url,
+            out = self.api_config.request(
+                Get_a_Chapter.method,
+                Get_a_Chapter.url,
+                Get_a_Chapter.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = f"Error running function 'Get_Audiobook_Chapters': {str(e)}"
+            error_msg = f"Error running function 'Get_a_Chapter': {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
 class Get_Several_Chapters(BaseFunction):
-    """Retrieve multiple chapters by their Spotify IDs."""
+    """Retrieve multiple chapters by their Spotify IDs, up to a maximum of 50."""
 
     name = "Get Several Chapters"
-    url = "https://api.spotify.com/v1/chapters"
+    url = "/chapters"
     args_in_url = False
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="ids", param_type=ParameterType.STRING, required=True
-            ),  # Comma-separated list of Spotify IDs for chapters. Max 50 IDs.,
+            ),  # Comma-separated list of Spotify IDs for chapters. Max 50 IDs. Example: '0IsXVP0JmcB2adSE338GkK,3ZXb8FKZGU0EHALYX6uCzU'.,
             Parameter(
                 name="market", param_type=ParameterType.STRING, required=False
-            ),  # ISO 3166-1 alpha-2 country code. Content availability depends on market.
+            ),  # ISO 3166-1 alpha-2 country code. Content is available within specified markets.
         ]
 
     def get_output_schema(self):
@@ -5111,7 +5188,7 @@ class Get_Several_Chapters(BaseFunction):
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_Several_Chapters.method,
                 Get_Several_Chapters.url,
                 Get_Several_Chapters.args_in_url,
@@ -5124,8 +5201,55 @@ class Get_Several_Chapters(BaseFunction):
             raise ValueError(error_msg)
 
 
+class Upload_Custom_Playlist_Cover_Image(BaseFunction):
+    """Replace the playlist's cover image with a new one, provided as Base64 encoded JPEG."""
+
+    name = "Upload Custom Playlist Cover Image"
+    url = "/playlists/{playlist_id}/images"
+    args_in_url = True
+    method = "PUT"
+
+    def __init__(self):
+        self.api_config = APIClientConfig()
+
+    def get_parameter_schema(self):
+        return [
+            Parameter(
+                name="playlist_id", param_type=ParameterType.STRING, required=True
+            ),  # Spotify ID of the playlist. Example: '3cEYpjA9oz9GiPac4AsH4n'.,
+            Parameter(
+                name="image_data", param_type=ParameterType.STRING, required=True
+            ),  # Base64 encoded JPEG image data, max 256 KB. Example: '/9j/...'
+        ]
+
+    def get_output_schema(self):
+        return [
+            OutputParameter(
+                name="status_code",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # HTTP status code indicating success or failure.
+        ]
+
+    def process(self, input_data: StandardInput) -> StandardOutput:
+        try:
+            out = self.api_config.request(
+                Upload_Custom_Playlist_Cover_Image.method,
+                Upload_Custom_Playlist_Cover_Image.url,
+                Upload_Custom_Playlist_Cover_Image.args_in_url,
+                input_data.validated_data,
+            )
+            return StandardOutput(out, self.get_output_schema())
+        except Exception as e:
+            error_msg = (
+                f"Error running function 'Upload_Custom_Playlist_Cover_Image': {str(e)}"
+            )
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+
 class Toggle_Playback_Shuffle(BaseFunction):
-    """Controls whether shuffle is enabled or disabled on the user's playback."""
+    """Control playback shuffle state for user's current device."""
 
     name = "Toggle Playback Shuffle"
     url = "https://api.spotify.com/v1/me/player/shuffle"
@@ -5133,24 +5257,30 @@ class Toggle_Playback_Shuffle(BaseFunction):
     method = "PUT"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="state", param_type=ParameterType.BOOLEAN, required=True
-            ),  # Required. true to shuffle user's playback; false to do not shuffle user's playback.,
+            ),  # Required. True to shuffle user's playback; false to disable shuffle. Example: true.,
             Parameter(
                 name="device_id", param_type=ParameterType.STRING, required=False
-            ),  # Optional. The id of the device this command is targeting. If not supplied, the currently active device is the target.
+            ),  # Optional. The id of the device this command is targeting. If not supplied, the user's currently active device is used. Example: '0d1841b0976bae2a3a310dd74c0f3df354899bc8'.
         ]
 
     def get_output_schema(self):
-        return []
+        return [
+            OutputParameter(
+                name="status_code",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # HTTP response status code. 204 indicates success.
+        ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Toggle_Playback_Shuffle.method,
                 Toggle_Playback_Shuffle.url,
                 Toggle_Playback_Shuffle.args_in_url,
@@ -5164,7 +5294,7 @@ class Toggle_Playback_Shuffle(BaseFunction):
 
 
 class Get_Several_Browse_Categories(BaseFunction):
-    """Retrieves a list of categories used to tag items in Spotify."""
+    """Retrieve a list of available categories used to tag items in Spotify."""
 
     name = "Get Several Browse Categories"
     url = "https://api.spotify.com/v1/browse/categories"
@@ -5172,31 +5302,66 @@ class Get_Several_Browse_Categories(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="locale", param_type=ParameterType.STRING, required=False
-            ),  # Optional. The desired language, consisting of an ISO 639-1 language code and an ISO 3166-1 alpha-2 country code, joined by an underscore (e.g., 'es_MX'). This parameter specifies in which language the category strings should be returned.,
+            ),  # Optional. The desired language, consisting of an ISO 639-1 language code and an ISO 3166-1 alpha-2 country code, joined by an underscore. Example: 'sv_SE'.,
             Parameter(
                 name="limit", param_type=ParameterType.INTEGER, required=False
-            ),  # Optional. The maximum number of items to return. Default is 20. Minimum is 1, maximum is 50.,
+            ),  # Optional. Maximum number of items to return. Default: 20. Range: 1-50. Example: 10.,
             Parameter(
                 name="offset", param_type=ParameterType.INTEGER, required=False
-            ),  # Optional. The index of the first item to return. Default is 0.
+            ),  # Optional. The index of the first item to return. Default: 0. Example: 5.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
-                name="categories", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # A paged set of categories.
+                name="categories", param_type=OutputParameterType.OBJECT, is_array=True
+            ),  # A paged set of categories.,
+            OutputParameter(
+                name="categories.href",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # A link to the Web API endpoint returning full results.,
+            OutputParameter(
+                name="categories.limit",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # The maximum number of items in the response.,
+            OutputParameter(
+                name="categories.next",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # URL to next page, or null if none.,
+            OutputParameter(
+                name="categories.offset",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # The offset of the first item in the response.,
+            OutputParameter(
+                name="categories.previous",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # URL to previous page, or null if none.,
+            OutputParameter(
+                name="categories.total",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Total number of categories available.,
+            OutputParameter(
+                name="categories.items",
+                param_type=OutputParameterType.OBJECT,
+                is_array=True,
+            ),  # Array of category objects.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_Several_Browse_Categories.method,
                 Get_Several_Browse_Categories.url,
                 Get_Several_Browse_Categories.args_in_url,
@@ -5212,7 +5377,7 @@ class Get_Several_Browse_Categories(BaseFunction):
 
 
 class Get_Track(BaseFunction):
-    """Retrieves detailed information about a specific track by its Spotify ID."""
+    """Retrieve detailed information about a specific track by its Spotify ID."""
 
     name = "Get Track"
     url = "https://api.spotify.com/v1/tracks/{id}"
@@ -5220,36 +5385,149 @@ class Get_Track(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="id", param_type=ParameterType.STRING, required=True
-            ),  # Required. The Spotify ID of the track.,
+            ),  # Required. The Spotify ID of the track. Example: '11dFghVXANMlKmJXsNCbNl'.,
             Parameter(
                 name="market", param_type=ParameterType.STRING, required=False
-            ),  # Optional. An ISO 3166-1 alpha-2 country code. If specified, only content available in that market will be returned. If a user access token is provided, the country of the user account will take priority. If neither market nor user country is provided, content is considered unavailable.
+            ),  # Optional. An ISO 3166-1 alpha-2 country code. If specified, limits the content to that market. If user access token's country is available, it takes priority. Example: 'ES'.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
                 name="album", param_type=OutputParameterType.OBJECT, is_array=False
-            ),  # The album on which the track appears. Contains details like album type, total tracks, available markets, external URLs, images, name, release date, restrictions, type, URI, and artists.,
+            ),  # The album on which the track appears.,
+            OutputParameter(
+                name="album.album_type",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Required. The type of the album. Allowed values: 'album', 'single', 'compilation'. Example: 'compilation'.,
+            OutputParameter(
+                name="album.total_tracks",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Required. Total number of tracks in the album. Example: 9.,
+            OutputParameter(
+                name="album.available_markets",
+                param_type=OutputParameterType.STRING,
+                is_array=True,
+            ),  # Markets where the album is available, identified by ISO 3166-1 alpha-2 codes. Example: ['CA','BR','IT'].,
+            OutputParameter(
+                name="album.external_urls",
+                param_type=OutputParameterType.OBJECT,
+                is_array=False,
+            ),  # External URLs for the album.,
+            OutputParameter(
+                name="album.external_urls.spotify",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # The Spotify URL of the album.,
+            OutputParameter(
+                name="album.href", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Link to API endpoint for full album details.,
+            OutputParameter(
+                name="album.id", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Spotify ID of the album.,
+            OutputParameter(
+                name="album.images",
+                param_type=OutputParameterType.OBJECT,
+                is_array=True,
+            ),  # Album cover images in various sizes.,
+            OutputParameter(
+                name="album.images.url",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Source URL of the image.,
+            OutputParameter(
+                name="album.images.height",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Nullable. Image height in pixels.,
+            OutputParameter(
+                name="album.images.width",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # Nullable. Image width in pixels.,
+            OutputParameter(
+                name="album.name", param_type=OutputParameterType.STRING, is_array=False
+            ),  # The name of the album.,
+            OutputParameter(
+                name="album.release_date",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # The release date of the album. Example: '1981-12'.,
+            OutputParameter(
+                name="album.release_date_precision",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # The precision of the release date. Allowed: 'year', 'month', 'day'.,
+            OutputParameter(
+                name="album.restrictions",
+                param_type=OutputParameterType.OBJECT,
+                is_array=False,
+            ),  # Content restrictions if any.,
+            OutputParameter(
+                name="album.restrictions.reason",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Reason for restriction. Allowed: 'market', 'product', 'explicit'.,
+            OutputParameter(
+                name="album.type", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Object type, typically 'album'.,
+            OutputParameter(
+                name="album.uri", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Spotify URI of the album.,
             OutputParameter(
                 name="artists", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # The artists of the track, each including external URLs, href, id, name, type, and uri.,
+            ),  # Artists of the track.,
+            OutputParameter(
+                name="artists.external_urls",
+                param_type=OutputParameterType.OBJECT,
+                is_array=False,
+            ),  # External URLs for the artist.,
+            OutputParameter(
+                name="artists.external_urls.spotify",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Spotify URL for the artist.,
+            OutputParameter(
+                name="artists.href",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # API link to artist details.,
+            OutputParameter(
+                name="artists.id", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Spotify ID of the artist.,
+            OutputParameter(
+                name="artists.name",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Artist's name.,
+            OutputParameter(
+                name="artists.type",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Object type, e.g., 'artist'.,
+            OutputParameter(
+                name="artists.uri",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Spotify URI for the artist.,
             OutputParameter(
                 name="available_markets",
                 param_type=OutputParameterType.STRING,
                 is_array=True,
-            ),  # List of countries where the track can be played, identified by ISO 3166-1 alpha-2 codes.,
+            ),  # Markets where the track is available, identified by ISO 3166-1 alpha-2 codes.,
             OutputParameter(
                 name="disc_number",
                 param_type=OutputParameterType.INTEGER,
                 is_array=False,
-            ),  # Disc number, usually 1 unless the album has multiple discs.,
+            ),  # Disc number, usually 1.,
             OutputParameter(
                 name="duration_ms",
                 param_type=OutputParameterType.INTEGER,
@@ -5257,70 +5535,95 @@ class Get_Track(BaseFunction):
             ),  # Length of the track in milliseconds.,
             OutputParameter(
                 name="explicit", param_type=OutputParameterType.BOOLEAN, is_array=False
-            ),  # Indicates if the track has explicit lyrics.,
+            ),  # Whether the track has explicit lyrics.,
             OutputParameter(
                 name="external_ids",
                 param_type=OutputParameterType.OBJECT,
                 is_array=False,
-            ),  # External IDs for the track, such as ISRC, EAN, UPC.,
+            ),  # External IDs for the track.,
+            OutputParameter(
+                name="external_ids.isrc",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # International Standard Recording Code.,
+            OutputParameter(
+                name="external_ids.ean",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # European Article Number.,
+            OutputParameter(
+                name="external_ids.upc",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Universal Product Code.,
             OutputParameter(
                 name="external_urls",
                 param_type=OutputParameterType.OBJECT,
                 is_array=False,
-            ),  # External URLs for the track, including Spotify URL.,
+            ),  # External URLs for the track.,
+            OutputParameter(
+                name="external_urls.spotify",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Spotify URL of the track.,
             OutputParameter(
                 name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Link to the Web API endpoint for full details of the track.,
+            ),  # Link to API endpoint for track details.,
             OutputParameter(
                 name="id", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify ID for the track.,
+            ),  # Spotify ID of the track.,
             OutputParameter(
                 name="is_playable",
                 param_type=OutputParameterType.BOOLEAN,
                 is_array=False,
-            ),  # Part of response when track relinking is applied; indicates if the track is playable in the given market.,
+            ),  # Indicates if the track is playable in the given market.,
             OutputParameter(
                 name="linked_from",
                 param_type=OutputParameterType.OBJECT,
                 is_array=False,
-            ),  # Contains information about the originally requested track if relinking has replaced it.,
+            ),  # Contains information if track is relinked to another track.,
             OutputParameter(
                 name="restrictions",
                 param_type=OutputParameterType.OBJECT,
                 is_array=False,
-            ),  # Restrictions applied to the content, including reason.,
+            ),  # Restrictions if any.,
+            OutputParameter(
+                name="restrictions.reason",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # Reason for restriction: 'market', 'product', or 'explicit'.,
             OutputParameter(
                 name="name", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Name of the track.,
+            ),  # Track name.,
             OutputParameter(
                 name="popularity",
                 param_type=OutputParameterType.INTEGER,
                 is_array=False,
-            ),  # Popularity of the track, between 0 and 100.,
+            ),  # Track's popularity score (0-100).,
             OutputParameter(
                 name="preview_url",
                 param_type=OutputParameterType.STRING,
                 is_array=False,
-            ),  # URL to a 30-second preview of the track, or null. Deprecated.,
+            ),  # URL to a 30-second preview of the track.,
             OutputParameter(
                 name="track_number",
                 param_type=OutputParameterType.INTEGER,
                 is_array=False,
-            ),  # Track number on the album.,
+            ),  # Track's position in the album.,
             OutputParameter(
                 name="type", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Object type, which is 'track'.,
+            ),  # Object type, typically 'track'.,
             OutputParameter(
                 name="uri", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Spotify URI for the track.,
+            ),  # Spotify URI of the track.,
             OutputParameter(
                 name="is_local", param_type=OutputParameterType.BOOLEAN, is_array=False
-            ),  # Indicates if the track is from a local file.
+            ),  # Whether the track is from a local file.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_Track.method,
                 Get_Track.url,
                 Get_Track.args_in_url,
@@ -5334,7 +5637,7 @@ class Get_Track(BaseFunction):
 
 
 class Get_Playlist_Items(BaseFunction):
-    """Retrieves the tracks or episodes of a playlist, with support for pagination and filtering."""
+    """Retrieve the items (tracks or episodes) of a specified playlist, with optional filtering and pagination."""
 
     name = "Get Playlist Items"
     url = "https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
@@ -5342,58 +5645,58 @@ class Get_Playlist_Items(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="playlist_id", param_type=ParameterType.STRING, required=True
-            ),  # The [Spotify ID](/documentation/web-api/concepts/spotify-uris-ids) of the playlist.,
+            ),  # The Spotify ID of the playlist. This is a unique identifier for the playlist, e.g., '3cEYpjA9oz9GiPac4AsH4n'.,
             Parameter(
                 name="market", param_type=ParameterType.STRING, required=False
-            ),  # An [ISO 3166-1 alpha-2 country code](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2). If a country code is specified, only content available in that market will be returned. Defaults to the user's country if a user access token is provided.,
+            ),  # A Spotify country code (ISO 3166-1 alpha-2). If specified, only content available in that market will be returned. Example: 'ES'.,
             Parameter(
                 name="fields", param_type=ParameterType.STRING, required=False
-            ),  # Filters for the query: a comma-separated list of the fields to return. If omitted, all fields are returned.,
+            ),  # A comma-separated list of the fields to include in the response. Supports nested object fields using parentheses. Example: 'items(added_at,track(name,href,album(name,href)))'.,
             Parameter(
                 name="limit", param_type=ParameterType.INTEGER, required=False
-            ),  # The maximum number of items to return. Default: 20. Range: 1-50.,
+            ),  # Maximum number of items to return. Default is 20. Range: 1-50. Example: 10.,
             Parameter(
                 name="offset", param_type=ParameterType.INTEGER, required=False
-            ),  # The index of the first item to return. Default: 0.,
+            ),  # The index of the first item to return. Default is 0. Example: 5.,
             Parameter(
                 name="additional_types", param_type=ParameterType.STRING, required=False
-            ),  # A comma-separated list of item types supported besides 'track'. Valid types: 'track' and 'episode'.
+            ),  # A comma-separated list of item types supported besides 'track'. Valid types include 'track' and 'episode'. Used to support multiple content types.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
                 name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # A link to the Web API endpoint returning the full result of the request.,
+            ),  # Link to the Web API endpoint returning the full result of the request.,
             OutputParameter(
                 name="limit", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # The maximum number of items in the response.,
+            ),  # Maximum number of items in the response.,
             OutputParameter(
                 name="next", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to the next page of items, or null if none.,
+            ),  # URL to the next page of items. Null if there is no next page.,
             OutputParameter(
                 name="offset", param_type=OutputParameterType.INTEGER, is_array=False
             ),  # The offset of the items returned.,
             OutputParameter(
                 name="previous", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to the previous page of items, or null if none.,
+            ),  # URL to the previous page of items. Null if there is no previous page.,
             OutputParameter(
                 name="total", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # The total number of items available to return.,
+            ),  # Total number of items available.,
             OutputParameter(
                 name="items", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # An array of PlaylistTrackObject. Each item includes details about added tracks or episodes.
+            ),  # Array of playlist track objects.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_Playlist_Items.method,
                 Get_Playlist_Items.url,
                 Get_Playlist_Items.args_in_url,
@@ -5406,51 +5709,51 @@ class Get_Playlist_Items(BaseFunction):
             raise ValueError(error_msg)
 
 
-class Get_Multiple_Audiobooks(BaseFunction):
-    """Fetches information for multiple audiobooks by their Spotify IDs, taking into account market restrictions."""
+class Get_Several_Audiobooks(BaseFunction):
+    """Retrieve information for multiple audiobooks by their Spotify IDs, limited to certain markets."""
 
-    name = "Get Multiple Audiobooks"
+    name = "Get Several Audiobooks"
     url = "https://api.spotify.com/v1/audiobooks"
     args_in_url = False
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="ids", param_type=ParameterType.STRING, required=True
-            ),  # A comma-separated list of the [Spotify IDs](/documentation/web-api/concepts/spotify-uris-ids) of the audiobooks, max 50 IDs.,
+            ),  # A comma-separated list of Spotify IDs for the audiobooks. Maximum 50 IDs. Example: '18yVqkdbdRvS24c0Ilj2ci,1HGw3J3NxZO1TP1BTtVhpZ'.,
             Parameter(
                 name="market", param_type=ParameterType.STRING, required=False
-            ),  # An [ISO 3166-1 alpha-2 country code](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2). If specified, only content available in that market will be returned.
+            ),  # A country code (ISO 3166-1 alpha-2). If specified, only content available in that market will be returned. Example: 'ES'.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
                 name="audiobooks", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # An array of AudiobookObject, each representing an audiobook or null if unavailable.
+            ),  # Array of audiobook objects, null items indicate unavailable audiobooks.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Get_Multiple_Audiobooks.method,
-                Get_Multiple_Audiobooks.url,
-                Get_Multiple_Audiobooks.args_in_url,
+            out = self.api_config.request(
+                Get_Several_Audiobooks.method,
+                Get_Several_Audiobooks.url,
+                Get_Several_Audiobooks.args_in_url,
                 input_data.validated_data,
             )
             return StandardOutput(out, self.get_output_schema())
         except Exception as e:
-            error_msg = f"Error running function 'Get_Multiple_Audiobooks': {str(e)}"
+            error_msg = f"Error running function 'Get_Several_Audiobooks': {str(e)}"
             logging.error(error_msg)
             raise ValueError(error_msg)
 
 
 class Save_Shows_for_Current_User(BaseFunction):
-    """Endpoint to save one or multiple shows to the current Spotify user's library."""
+    """Adds one or more shows to the current user's library. Requires 'user-library-modify' scope."""
 
     name = "Save Shows for Current User"
     url = "https://api.spotify.com/v1/me/shows"
@@ -5458,13 +5761,13 @@ class Save_Shows_for_Current_User(BaseFunction):
     method = "PUT"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="ids", param_type=ParameterType.STRING, required=True
-            ),  # A comma-separated list of the Spotify IDs for the shows to save. Maximum of 50 IDs. Example: '5CfCWKI5pZ28U0uOzXkDHe,5as3aKmN2k11yfDDDSrvaZ'.
+            ),  # A comma-separated list of the Spotify IDs for the shows to be saved. Must include no more than 50 IDs. Example: '5CfCWKI5pZ28U0uOzXkDHe,5as3aKmN2k11yfDDDSrvaZ'.
         ]
 
     def get_output_schema(self):
@@ -5472,7 +5775,7 @@ class Save_Shows_for_Current_User(BaseFunction):
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Save_Shows_for_Current_User.method,
                 Save_Shows_for_Current_User.url,
                 Save_Shows_for_Current_User.args_in_url,
@@ -5487,25 +5790,223 @@ class Save_Shows_for_Current_User(BaseFunction):
             raise ValueError(error_msg)
 
 
-class Get_a_List_of_Current_Users_Playlists(BaseFunction):
-    """Endpoint to retrieve a paginated list of playlists owned or followed by the current user."""
+class Get_Current_Users_Playlists(BaseFunction):
+    """Retrieves the current user's playlists. Requires 'playlist-read-private' scope."""
 
-    name = "Get a List of Current User's Playlists"
+    name = "Get Current User's Playlists"
     url = "https://api.spotify.com/v1/me/playlists"
     args_in_url = False
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="limit", param_type=ParameterType.INTEGER, required=False
-            ),  # The maximum number of items to return. Default: 20. Minimum: 1. Maximum: 50. Example: 10.,
+            ),  # The maximum number of playlists to return. Default is 20. Min is 1, max is 50.,
             Parameter(
                 name="offset", param_type=ParameterType.INTEGER, required=False
-            ),  # The index of the first playlist to return. Default: 0. Example: 5.
+            ),  # The index of the first playlist to return. Default is 0.
+        ]
+
+    def get_output_schema(self):
+        return [
+            OutputParameter(
+                name="href", param_type=OutputParameterType.STRING, is_array=False
+            ),  # A link to the Web API endpoint returning the full result of the request.,
+            OutputParameter(
+                name="limit", param_type=OutputParameterType.INTEGER, is_array=False
+            ),  # The maximum number of items in the response set.,
+            OutputParameter(
+                name="next", param_type=OutputParameterType.STRING, is_array=False
+            ),  # URL to the next page of the result set, or null if none.,
+            OutputParameter(
+                name="offset", param_type=OutputParameterType.INTEGER, is_array=False
+            ),  # The offset of the Playlist objects returned.,
+            OutputParameter(
+                name="previous", param_type=OutputParameterType.STRING, is_array=False
+            ),  # URL to the previous page of the result set, or null if none.,
+            OutputParameter(
+                name="total", param_type=OutputParameterType.INTEGER, is_array=False
+            ),  # The total number of playlists available.,
+            OutputParameter(
+                name="items", param_type=OutputParameterType.OBJECT, is_array=True
+            ),  # Array of playlist objects, each containing details like name, owner, images, tracks, etc.
+        ]
+
+    def process(self, input_data: StandardInput) -> StandardOutput:
+        try:
+            out = self.api_config.request(
+                Get_Current_Users_Playlists.method,
+                Get_Current_Users_Playlists.url,
+                Get_Current_Users_Playlists.args_in_url,
+                input_data.validated_data,
+            )
+            return StandardOutput(out, self.get_output_schema())
+        except Exception as e:
+            error_msg = (
+                f"Error running function 'Get_Current_Users_Playlists': {str(e)}"
+            )
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+
+class Unfollow_Playlist(BaseFunction):
+    """Removes the current user as a follower of a playlist. Requires 'playlist-modify-public' or 'playlist-modify-private' scope."""
+
+    name = "Unfollow Playlist"
+    url = "https://api.spotify.com/v1/playlists/{playlist_id}/followers"
+    args_in_url = True
+    method = "DELETE"
+
+    def __init__(self):
+        self.api_config = APIClientConfig()
+
+    def get_parameter_schema(self):
+        return [
+            Parameter(
+                name="playlist_id", param_type=ParameterType.STRING, required=True
+            ),  # The Spotify ID of the playlist to unfollow.
+        ]
+
+    def get_output_schema(self):
+        return []
+
+    def process(self, input_data: StandardInput) -> StandardOutput:
+        try:
+            out = self.api_config.request(
+                Unfollow_Playlist.method,
+                Unfollow_Playlist.url,
+                Unfollow_Playlist.args_in_url,
+                input_data.validated_data,
+            )
+            return StandardOutput(out, self.get_output_schema())
+        except Exception as e:
+            error_msg = f"Error running function 'Unfollow_Playlist': {str(e)}"
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+
+class Remove_Users_Saved_Episodes(BaseFunction):
+    """Removes one or more episodes from the current user's library. Requires 'user-library-modify' scope."""
+
+    name = "Remove User's Saved Episodes"
+    url = "https://api.spotify.com/v1/me/episodes"
+    args_in_url = False
+    method = "DELETE"
+
+    def __init__(self):
+        self.api_config = APIClientConfig()
+
+    def get_parameter_schema(self):
+        return [
+            Parameter(
+                name="ids", param_type=ParameterType.STRING, required=True
+            ),  # A comma-separated list of the Spotify IDs of episodes to remove, with a maximum of 50 IDs. Example: '4iV5W9uYEdYUVa79Axb7Rh,1301WleyT98MSxVHPZCA6M'.,
+            Parameter(
+                name="ids_array", param_type=OutputParameterType.OBJECT, required=False
+            ),  # An array of Spotify IDs of episodes to remove, maximum 50 items. The body of the request supports either 'ids' parameter or 'ids_array'.
+        ]
+
+    def get_output_schema(self):
+        return []
+
+    def process(self, input_data: StandardInput) -> StandardOutput:
+        try:
+            out = self.api_config.request(
+                Remove_Users_Saved_Episodes.method,
+                Remove_Users_Saved_Episodes.url,
+                Remove_Users_Saved_Episodes.args_in_url,
+                input_data.validated_data,
+            )
+            return StandardOutput(out, self.get_output_schema())
+        except Exception as e:
+            error_msg = (
+                f"Error running function 'Remove_Users_Saved_Episodes': {str(e)}"
+            )
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+
+class Client_Credentials_Flow_Token(BaseFunction):
+    """Obtains an access token using the Client Credentials flow for server-to-server authentication. Does not access user data."""
+
+    name = "Client Credentials Flow Token"
+    url = "https://accounts.spotify.com/api/token"
+    args_in_url = False
+    method = "GET"
+
+    def __init__(self):
+        self.api_config = APIClientConfig()
+
+    def get_parameter_schema(self):
+        return [
+            Parameter(
+                name="grant_type", param_type=ParameterType.STRING, required=True
+            ),  # Set to 'client_credentials'.,
+            Parameter(
+                name="client_id", param_type=ParameterType.STRING, required=True
+            ),  # Your Spotify application's client ID.,
+            Parameter(
+                name="client_secret", param_type=ParameterType.STRING, required=True
+            ),  # Your Spotify application's client secret.
+        ]
+
+    def get_output_schema(self):
+        return [
+            OutputParameter(
+                name="access_token",
+                param_type=OutputParameterType.STRING,
+                is_array=False,
+            ),  # A token that can be used in subsequent requests to the Spotify API.,
+            OutputParameter(
+                name="token_type", param_type=OutputParameterType.STRING, is_array=False
+            ),  # Type of the token, always 'Bearer'.,
+            OutputParameter(
+                name="expires_in",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # The time in seconds before the token expires.
+        ]
+
+    def process(self, input_data: StandardInput) -> StandardOutput:
+        try:
+            out = self.api_config.request(
+                Client_Credentials_Flow_Token.method,
+                Client_Credentials_Flow_Token.url,
+                Client_Credentials_Flow_Token.args_in_url,
+                input_data.validated_data,
+            )
+            return StandardOutput(out, self.get_output_schema())
+        except Exception as e:
+            error_msg = (
+                f"Error running function 'Client_Credentials_Flow_Token': {str(e)}"
+            )
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+
+class Get_Users_Saved_Audiobooks(BaseFunction):
+    """Retrieve a list of audiobooks saved in the current Spotify user's library."""
+
+    name = "Get User's Saved Audiobooks"
+    url = "https://api.spotify.com/v1/me/audiobooks"
+    args_in_url = False
+    method = "GET"
+
+    def __init__(self):
+        self.api_config = APIClientConfig()
+
+    def get_parameter_schema(self):
+        return [
+            Parameter(
+                name="limit", param_type=ParameterType.INTEGER, required=False
+            ),  # The maximum number of items to return. Default: 20. Range: 1 - 50.,
+            Parameter(
+                name="offset", param_type=ParameterType.INTEGER, required=False
+            ),  # The index of the first item to return. Default: 0.
         ]
 
     def get_output_schema(self):
@@ -5527,200 +6028,15 @@ class Get_a_List_of_Current_Users_Playlists(BaseFunction):
             ),  # URL to the previous page of items, or null if none.,
             OutputParameter(
                 name="total", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Total number of playlists.,
+            ),  # The total number of items available.,
             OutputParameter(
                 name="items", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Array of playlist objects.
+            ),  # Array of saved audiobook objects.
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
-                Get_a_List_of_Current_Users_Playlists.method,
-                Get_a_List_of_Current_Users_Playlists.url,
-                Get_a_List_of_Current_Users_Playlists.args_in_url,
-                input_data.validated_data,
-            )
-            return StandardOutput(out, self.get_output_schema())
-        except Exception as e:
-            error_msg = f"Error running function 'Get_a_List_of_Current_Users_Playlists': {str(e)}"
-            logging.error(error_msg)
-            raise ValueError(error_msg)
-
-
-class Unfollow_Playlist(BaseFunction):
-    """Endpoint to remove the current user as a follower of a specific playlist."""
-
-    name = "Unfollow Playlist"
-    url = "https://api.spotify.com/v1/playlists/{playlist_id}/followers"
-    args_in_url = True
-    method = "DELETE"
-
-    def __init__(self):
-        self.api_wrapper = api_wrapper
-
-    def get_parameter_schema(self):
-        return [
-            Parameter(
-                name="playlist_id", param_type=ParameterType.STRING, required=True
-            ),  # Spotify ID of the playlist to unfollow. Example: '3cEYpjA9oz9GiPac4AsH4n'.
-        ]
-
-    def get_output_schema(self):
-        return []
-
-    def process(self, input_data: StandardInput) -> StandardOutput:
-        try:
-            out = self.api_wrapper.request(
-                Unfollow_Playlist.method,
-                Unfollow_Playlist.url,
-                Unfollow_Playlist.args_in_url,
-                input_data.validated_data,
-            )
-            return StandardOutput(out, self.get_output_schema())
-        except Exception as e:
-            error_msg = f"Error running function 'Unfollow_Playlist': {str(e)}"
-            logging.error(error_msg)
-            raise ValueError(error_msg)
-
-
-class Remove_Users_Saved_Episodes(BaseFunction):
-    """Endpoint to remove episodes from the current user's library, accepting a list of episode IDs."""
-
-    name = "Remove User's Saved Episodes"
-    url = "https://api.spotify.com/v1/me/episodes"
-    args_in_url = False
-    method = "DELETE"
-
-    def __init__(self):
-        self.api_wrapper = api_wrapper
-
-    def get_parameter_schema(self):
-        return [
-            Parameter(
-                name="ids", param_type=ParameterType.STRING, required=True
-            ),  # A comma-separated list of Spotify IDs for the episodes to remove. Maximum of 50 IDs. Example: '7ouMYWpwJ422jRcDASZB7P,4VqPOruhp5EdPBeR92t6lQ,2takcwOaAZWiXQijPHIx7B'.
-        ]
-
-    def get_output_schema(self):
-        return []
-
-    def process(self, input_data: StandardInput) -> StandardOutput:
-        try:
-            out = self.api_wrapper.request(
-                Remove_Users_Saved_Episodes.method,
-                Remove_Users_Saved_Episodes.url,
-                Remove_Users_Saved_Episodes.args_in_url,
-                input_data.validated_data,
-            )
-            return StandardOutput(out, self.get_output_schema())
-        except Exception as e:
-            error_msg = (
-                f"Error running function 'Remove_Users_Saved_Episodes': {str(e)}"
-            )
-            logging.error(error_msg)
-            raise ValueError(error_msg)
-
-
-class Client_Credentials_Flow__Request_Token(BaseFunction):
-    """Endpoint to obtain an access token using the client credentials flow for server-to-server authentication."""
-
-    name = "Client Credentials Flow - Request Token"
-    url = "https://accounts.spotify.com/api/token"
-    args_in_url = False
-    method = "GET"
-
-    def __init__(self):
-        self.api_wrapper = api_wrapper
-
-    def get_parameter_schema(self):
-        return [
-            Parameter(
-                name="grant_type", param_type=ParameterType.STRING, required=True
-            ),  # Must be set to 'client_credentials' to obtain an access token.
-        ]
-
-    def get_output_schema(self):
-        return [
-            OutputParameter(
-                name="access_token",
-                param_type=OutputParameterType.STRING,
-                is_array=False,
-            ),  # An access token for making authenticated requests.,
-            OutputParameter(
-                name="token_type", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Always 'Bearer'.,
-            OutputParameter(
-                name="expires_in",
-                param_type=OutputParameterType.INTEGER,
-                is_array=False,
-            ),  # Token validity duration in seconds.
-        ]
-
-    def process(self, input_data: StandardInput) -> StandardOutput:
-        try:
-            out = self.api_wrapper.request(
-                Client_Credentials_Flow__Request_Token.method,
-                Client_Credentials_Flow__Request_Token.url,
-                Client_Credentials_Flow__Request_Token.args_in_url,
-                input_data.validated_data,
-            )
-            return StandardOutput(out, self.get_output_schema())
-        except Exception as e:
-            error_msg = f"Error running function 'Client_Credentials_Flow__Request_Token': {str(e)}"
-            logging.error(error_msg)
-            raise ValueError(error_msg)
-
-
-class Get_Users_Saved_Audiobooks(BaseFunction):
-    """Retrieve a list of audiobooks saved in the current user's library."""
-
-    name = "Get User's Saved Audiobooks"
-    url = "https://api.spotify.com/v1/me/audiobooks"
-    args_in_url = False
-    method = "GET"
-
-    def __init__(self):
-        self.api_wrapper = api_wrapper
-
-    def get_parameter_schema(self):
-        return [
-            Parameter(
-                name="limit", param_type=ParameterType.INTEGER, required=False
-            ),  # Maximum number of items to return. Default: 20. Range: 1 - 50.,
-            Parameter(
-                name="offset", param_type=ParameterType.INTEGER, required=False
-            ),  # Index of the first item to return. Default: 0.
-        ]
-
-    def get_output_schema(self):
-        return [
-            OutputParameter(
-                name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Link to the endpoint returning the full result of the request.,
-            OutputParameter(
-                name="limit", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Maximum number of items in the response.,
-            OutputParameter(
-                name="next", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to the next page of items, or null if none.,
-            OutputParameter(
-                name="offset", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # The offset of the items returned.,
-            OutputParameter(
-                name="previous", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to the previous page of items, or null if none.,
-            OutputParameter(
-                name="total", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Total number of items available.,
-            OutputParameter(
-                name="items", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # Array of saved audiobooks.
-        ]
-
-    def process(self, input_data: StandardInput) -> StandardOutput:
-        try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_Users_Saved_Audiobooks.method,
                 Get_Users_Saved_Audiobooks.url,
                 Get_Users_Saved_Audiobooks.args_in_url,
@@ -5733,8 +6049,55 @@ class Get_Users_Saved_Audiobooks(BaseFunction):
             raise ValueError(error_msg)
 
 
+class StartResume_a_Users_Playback(BaseFunction):
+    """Start or resume current playback on the user's device."""
+
+    name = "Start/Resume a User's Playback"
+    url = "https://api.spotify.com/v1/me/player/play"
+    args_in_url = True
+    method = "PUT"
+
+    def __init__(self):
+        self.api_config = APIClientConfig()
+
+    def get_parameter_schema(self):
+        return [
+            Parameter(
+                name="device_id", param_type=ParameterType.STRING, required=False
+            ),  # The ID of the device to target. If not specified, the active device is used.,
+            Parameter(
+                name="body", param_type=OutputParameterType.OBJECT, required=True
+            ),  # JSON body with options for playback.
+        ]
+
+    def get_output_schema(self):
+        return [
+            OutputParameter(
+                name="status_code",
+                param_type=OutputParameterType.INTEGER,
+                is_array=False,
+            ),  # HTTP status code indicating success (204) or errors like 401, 403, 429.
+        ]
+
+    def process(self, input_data: StandardInput) -> StandardOutput:
+        try:
+            out = self.api_config.request(
+                StartResume_a_Users_Playback.method,
+                StartResume_a_Users_Playback.url,
+                StartResume_a_Users_Playback.args_in_url,
+                input_data.validated_data,
+            )
+            return StandardOutput(out, self.get_output_schema())
+        except Exception as e:
+            error_msg = (
+                f"Error running function 'StartResume_a_Users_Playback': {str(e)}"
+            )
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+
 class Get_Users_Saved_Tracks(BaseFunction):
-    """Retrieve a list of tracks saved in the current user's library."""
+    """Retrieve a list of songs saved in the current user's library."""
 
     name = "Get User's Saved Tracks"
     url = "https://api.spotify.com/v1/me/tracks"
@@ -5742,41 +6105,41 @@ class Get_Users_Saved_Tracks(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="market", param_type=ParameterType.STRING, required=False
-            ),  # ISO 3166-1 alpha-2 country code. If specified, only content available in that market is returned. Example: 'ES'.,
+            ),  # ISO 3166-1 alpha-2 country code to filter content available in that market.,
             Parameter(
                 name="limit", param_type=ParameterType.INTEGER, required=False
             ),  # Maximum number of items to return. Default: 20. Range: 1 - 50.,
             Parameter(
                 name="offset", param_type=ParameterType.INTEGER, required=False
-            ),  # Index of the first item to return. Default: 0.
+            ),  # The index of the first item to return. Default: 0.
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
                 name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # Link to the endpoint returning the full result.,
+            ),  # A link to the Web API endpoint returning the full result.,
             OutputParameter(
                 name="limit", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Maximum number of items in the response.,
+            ),  # The maximum number of items in the response.,
             OutputParameter(
                 name="next", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to the next page, or null if none.,
+            ),  # URL to the next page of items, or null if none.,
             OutputParameter(
                 name="offset", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Offset of the items.,
+            ),  # The offset of the items returned.,
             OutputParameter(
                 name="previous", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to the previous page, or null if none.,
+            ),  # URL to the previous page of items, or null if none.,
             OutputParameter(
                 name="total", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Total number of saved tracks.,
+            ),  # The total number of saved tracks.,
             OutputParameter(
                 name="items", param_type=OutputParameterType.OBJECT, is_array=True
             ),  # Array of saved track objects.
@@ -5784,7 +6147,7 @@ class Get_Users_Saved_Tracks(BaseFunction):
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_Users_Saved_Tracks.method,
                 Get_Users_Saved_Tracks.url,
                 Get_Users_Saved_Tracks.args_in_url,
@@ -5798,7 +6161,7 @@ class Get_Users_Saved_Tracks(BaseFunction):
 
 
 class Get_Users_Playlists(BaseFunction):
-    """Retrieve a list of the playlists owned or followed by a Spotify user. Requires 'playlist-read-private' scope."""
+    """Retrieves a list of playlists owned or followed by a specific Spotify user."""
 
     name = "Get User's Playlists"
     url = "https://api.spotify.com/v1/users/{user_id}/playlists"
@@ -5806,49 +6169,43 @@ class Get_Users_Playlists(BaseFunction):
     method = "GET"
 
     def __init__(self):
-        self.api_wrapper = api_wrapper
+        self.api_config = APIClientConfig()
 
     def get_parameter_schema(self):
         return [
             Parameter(
                 name="user_id", param_type=ParameterType.STRING, required=True
-            ),  # The Spotify user ID. Examples: 'smedjan'. This is a path parameter, part of the URL.,
-            Parameter(
-                name="limit", param_type=ParameterType.INTEGER, required=False
-            ),  # Maximum number of playlists to return. Default is 20. Allowed range: 1-50.,
-            Parameter(
-                name="offset", param_type=ParameterType.INTEGER, required=False
-            ),  # Index of the first playlist to return. Default is 0. Allowed range: 0-100000.
+            ),  # The Spotify user ID of the user whose playlists are to be retrieved. Example: 'smedjan'
         ]
 
     def get_output_schema(self):
         return [
             OutputParameter(
                 name="href", param_type=OutputParameterType.STRING, is_array=False
-            ),  # A link to the Web API endpoint returning the full result of the request.,
+            ),  # A link to the Web API endpoint returning the full result of the request. Example: 'https://api.spotify.com/v1/me/shows?offset=0&limit=20',
             OutputParameter(
                 name="limit", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Maximum number of items in the response.,
+            ),  # The maximum number of items in the response (as set in the query or by default). Example: 20,
             OutputParameter(
                 name="next", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to the next page of items, or null if none.,
+            ),  # URL to the next page of items. ('null' if none). Example: 'https://api.spotify.com/v1/me/shows?offset=1&limit=1',
             OutputParameter(
                 name="offset", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # The offset of the items returned.,
+            ),  # The offset of the items returned (as set in the query or by default). Example: 0,
             OutputParameter(
                 name="previous", param_type=OutputParameterType.STRING, is_array=False
-            ),  # URL to the previous page of items, or null if none.,
+            ),  # URL to the previous page of items. ('null' if none). Example: 'https://api.spotify.com/v1/me/shows?offset=1&limit=1',
             OutputParameter(
                 name="total", param_type=OutputParameterType.INTEGER, is_array=False
-            ),  # Total number of playlists available.,
+            ),  # Total number of items available to return. Example: 4,
             OutputParameter(
                 name="items", param_type=OutputParameterType.OBJECT, is_array=True
-            ),  # An array of playlist objects.
+            ),  # An array of playlist objects
         ]
 
     def process(self, input_data: StandardInput) -> StandardOutput:
         try:
-            out = self.api_wrapper.request(
+            out = self.api_config.request(
                 Get_Users_Playlists.method,
                 Get_Users_Playlists.url,
                 Get_Users_Playlists.args_in_url,
