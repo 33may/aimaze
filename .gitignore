@@ -4,6 +4,7 @@
 # uv.lock
 # flake.lock
 
+test/gh/
 .env
 .idea/
 

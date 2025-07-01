@@ -1,4 +1,6 @@
 import os
+import platform
+
 from urllib.parse import urljoin
 
 from validators import url as validate_url
@@ -7,47 +9,47 @@ from gen.gen import extract_schemas, generate_code
 from scrape import bfs_site
 
 
-# api_name = "Github Actions"
-# base_url = "https://api.github.com/"
-# output_file_loc = "test/gh.py"
-# documentation_domains = [
-#     ("https://docs.github.com/en/rest/actions/artifacts?apiVersion=2022-11-28", "https://docs.github.com/en/rest/actions"),
-#     ("https://docs.github.com/en/rest/authentication/endpoints-available-for-github-app-installation-access-tokens?apiVersion=2022-11-28", "https://docs.github.com/en/rest/authentication"),
-# ]
+api_name = "Github Actions"
+base_url = "https://api.github.com/"
+output_folder_loc = "test/gh/"
+documentation_domains = [
+    ("https://docs.github.com/en/rest/actions/artifacts?apiVersion=2022-11-28", "https://docs.github.com/en/rest/actions"),
+    ("https://docs.github.com/en/rest/authentication/endpoints-available-for-github-app-installation-access-tokens?apiVersion=2022-11-28", "https://docs.github.com/en/rest/authentication"),
+]
 
 
 # api_name = "Woo commerce"
 # base_url = "https://woocommerce.github.io/woocommerce-rest-api-docs"
-# output_file_loc = "test/woo_test.py"
+# output_folder_loc = "test/woo_test.py"
 # documentation_domains = [ ("https://woocommerce.github.io/woocommerce-rest-api-docs" , "")]
 
 
-api_name = "Spotify"
-base_url = "https://developer.spotify.com/documentation/web-api"
-output_file_loc = "test/spotify.py"
-documentation_domains = [ ("https://developer.spotify.com/documentation/web-api" , "")]
+# api_name = "Spotify"
+# base_url = "https://developer.spotify.com/documentation/web-api"
+# output_folder_loc = "test/spotify.py"
+# documentation_domains = [ ("https://developer.spotify.com/documentation/web-api" , "")]
 
 
 # api_name = "WebWinkel"
 # base_url = "https://docs.webwinkelkeur.nl"
-# output_file_loc = "test/webwinkel.py"
+# output_folder_loc = "test/webwinkel.py"
 # documentation_domains = [ ("https://docs.webwinkelkeur.nl" , "")]
 
 # api_name = "anewspring"
 # base_url = "https://docs.webwinkelkeur.nl"
-# output_file_loc = "test/webwinkel.py"
+# output_folder_loc = "test/webwinkel.py"
 # documentation_domains = [ ("https://docs.webwinkelkeur.nl" , "")]
 
 
 # api_name = "Pipe"
 # base_url = "Https://developers.pipedrive.com"
-# output_file_loc = "test/pipe.py"
+# output_folder_loc = "test/pipe.py"
 # documentation_domains = [ ("Https://developers.pipedrive.com" , "/docs/api/v1")]
 
 
 
 def main():
-    os.system("clear")
+    os.system("cls" if platform.system() == "Windows" else "clear")
 
     print("Tool is running, this could take a couple of minutes.")
     pages = {}
@@ -56,8 +58,8 @@ def main():
         pages.update(bfs_site(starting_url, domain_url))
 
     schemas = extract_schemas(pages)
-    generate_code(schemas, base_url, api_name, output_file_loc)
-    print(f"Code generated and saved at {output_file_loc}")
+    generate_code(schemas, base_url, api_name, output_folder_loc)
+    print(f"Code generated and saved at {output_folder_loc}")
 
 
 def get_valid_url(prompt: str) -> str:
@@ -71,21 +73,21 @@ def get_valid_url(prompt: str) -> str:
                 
 
 def main_menu():
-    global api_name, base_url, output_file_loc
+    global api_name, base_url, output_folder_loc
 
     while True:
-        os.system("clear")
+        os.system("cls" if platform.system() == "Windows" else "clear")
         action = input(f"""
         This tool will scrape the documentation of a selected API and generate Python code to call it. Please set the following information:
 
          (1) API Name: {api_name or "not set"}
          (2) API Base URL: {base_url or "not set"}
-         (3) Output file location: {output_file_loc or "not set"}
+         (3) Output file location: {output_folder_loc or "not set"}
          (4) Documentation website domains: 
              {"\n\n             ".join([f"- Starting URL: {start}\n               Domain: {domain}"
                                 for start, domain in documentation_domains]) or "not set"}
                
-         {"(C)onfirm" if all([api_name, base_url, output_file_loc, documentation_domains]) else "All fields above are required before processing."}
+         {"(C)onfirm" if all([api_name, base_url, output_folder_loc, documentation_domains]) else "All fields above are required before processing."}
          (E)xit
 
         """)
@@ -99,24 +101,28 @@ def main_menu():
                 
             case "3":
                 while True:
-                    output_file_loc = input("Please enter the output Python file location: ").strip()
+                    output_folder_loc = input("Please enter the output folder location: ").strip()
+
+                    if "." in output_folder_loc:
+                        print("Output location should not be a file, but a folder instead.")
+                        continue
                     
-                    if not output_file_loc.endswith(".py"):
-                        if not output_file_loc.endswith("/"):
-                            output_file_loc += "/"
-                        output_file_loc += "api_wrapper.py"
+                    if not output_folder_loc.endswith("/"):
+                        output_folder_loc += "/"
                     
                     try:
-                        open(output_file_loc, "w")
+                        os.mkdir(output_folder_loc)
+                        break
+                    except FileExistsError:
                         break
                     except:
                         print("Invalid file location.")
             case "4":
                 domain_menu()
                 
-            case "c" if all([api_name, base_url, output_file_loc, documentation_domains]):
+            case "c" if all([api_name, base_url, output_folder_loc, documentation_domains]):
                 if input("Are you sure these fields are correct? [y]es, [n]o\n").lower()[0] == "y":
-                    os.system(f"touch {output_file_loc}")
+                    os.system(f"touch {output_folder_loc}")
                     main()
                     exit()
 
@@ -132,7 +138,7 @@ def domain_menu():
     global documentation_domains
 
     while True:
-        os.system("clear")
+        os.system("cls" if platform.system() == "Windows" else "clear")
         action = input(f"""
         The scraper performs a breadth-first search on all links it finds, within the specified domain.
 

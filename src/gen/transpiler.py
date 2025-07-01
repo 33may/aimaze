@@ -13,15 +13,15 @@ from OutputParameterClass import OutputParameter, OutputParameterType
 from InputClass import StandardInput
 from OutputClass import StandardOutput
 
-# from {types_loc}.FunctionClass import BaseFunction
-# from {types_loc}.ParameterClass import Parameter, ParameterType
-# from {types_loc}.OutputParameterClass import OutputParameter, OutputParameterType
-# from {types_loc}.InputClass import StandardInput
-# from {types_loc}.OutputClass import StandardOutput
-
 from dataclasses import dataclass
 import logging
-        
+
+import re, json
+from requests import get, post
+"""
+
+API_CONFIG = """
+
 
 METHODS = {{"GET": get,
            "POST": post}}
@@ -63,6 +63,8 @@ class APIClientConfig:
 """
 
 ENDPOINT_CODE = """
+from api_config import APIClientConfig
+
 
 class {class_name}(BaseFunction):
     {endpoint_description}
@@ -129,7 +131,7 @@ def _encode_parameters(params: list, output: bool) -> list[Parameter] | list[Out
      return ",\n\t\t\t".join(params)
 
 
-def default_or_none(default: str, var_type: str) -> str:
+def _default_or_none(default: str, var_type: str) -> str:
     if default == "None": return default
 
     if not default: return "None"
@@ -138,32 +140,29 @@ def default_or_none(default: str, var_type: str) -> str:
         return f'"{default}"'
 
 
-def wrap_api(schema: dict, base_url: str, api_name: str) -> str:
+def wrap_api(schema: dict, base_url: str, api_name: str) -> dict[str, str]:
     validate(instance=schema, schema=SCHEMA_PARSE)
 
     # //TODO fix Fields with a default value must come after any fields without a default.
     # //TODO fix when using filed of the class use self 
 
-    config_vars = [f"    # {v['explanation']}\n    {v['var_name'].replace('-', '_')}: {v['type']} = {default_or_none(v['default_val'], v['type'])}" for v in schema["general_info"]]
-    print(config_vars)
+    config_vars = [f"    # {v['explanation']}\n    {v['var_name'].replace('-', '_')}: {v['type']} = {_default_or_none(v['default_val'], v['type'])}" for v in schema["general_info"]]
+    scripts = {"api_config.py": IMPORTS + API_CONFIG.format(base_url=base_url, 
+                                                            api_name=api_name, 
+                                                            types_loc="shared",
+                                                            variables="\n\n".join(config_vars))}
 
-    code = IMPORTS.format(base_url=base_url, 
-                          api_name=api_name, 
-                          types_loc="shared",
-                          variables="\n\n".join(config_vars))
+    for endpoint in schema["endpoints"]:
+        func_name = re.sub("[^\w_]", "", endpoint["name"].replace(" ", "_"))
+        scripts[func_name + ".py"] = (
+            IMPORTS + 
+            ENDPOINT_CODE.format(class_name=func_name, name=endpoint["name"], url=endpoint["url"],
+                                 args_in_url=endpoint["args_in_url"], method=endpoint["method"],
+                                 endpoint_description=f"\"\"\"{endpoint['description']}\"\"\"" if 'description' in endpoint else "",
+                                 input_parameters=_encode_parameters(endpoint["input_parameters"], 
+                                                                     output=False),
+                                 output_parameters=_encode_parameters(endpoint["output_parameters"], 
+                                                                      output=True))
+        )
+    return {filename: format_str(code, mode=FileMode()) for filename, code in scripts.items()}
 
-    code += "".join([ENDPOINT_CODE.format(class_name=re.sub("\W", "", endpoint["name"].replace(" ", "_")),
-                                          name=endpoint["name"],
-                                          url=endpoint["url"],
-                                          args_in_url=endpoint["args_in_url"],
-                                          method=endpoint["method"],
-                                          endpoint_description=f"\"\"\"{endpoint['description']}\"\"\"" if 'description' in endpoint else "",
-                                          input_parameters=_encode_parameters(endpoint["input_parameters"], output=False),
-                                          output_parameters=_encode_parameters(endpoint["output_parameters"], output=True),
-                                          )
-                     for endpoint in schema["endpoints"]])
-
-    with open("test/code_raw.py", "w") as f:
-        f.write(code)
-    # print("\n".join([f"{i} {line}" for i, line in enumerate(code.split("\n"))]))
-    return format_str(code, mode=FileMode())

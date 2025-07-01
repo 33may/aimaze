@@ -59,7 +59,7 @@ client = OpenAI(api_key=os.getenv("API_KEY"))
 # After loop prints on same lines these so we wipe longer text previously on line.
 CLEARLINE = "                      "
 
-def filter_gen_info(info: list[dict]) -> dict:
+def _filter_gen_info(info: list[dict]) -> dict:
     chat_completion = client.chat.completions.create(
             messages=[
                 {
@@ -150,12 +150,15 @@ def extract_schemas(pages: dict[str, str]) -> dict:
         processed += len(chunk)
         print(f"{processed}/{total} pages processed.{CLEARLINE*2}", end="\r")
 
-    schemas["general_info"] = filter_gen_info(schemas["general_info"])
+    schemas["general_info"] = _filter_gen_info(schemas["general_info"])
     with open("tmp.json", 'w') as f:
         json.dump(schemas, f, indent=4)
 
     return schemas
 
 def generate_code(schema: dict, base_url: str, api_name: str, output_file_loc: str):
-    with open(output_file_loc, "w") as f:
-        f.write(wrap_api(schema, base_url, api_name))
+    scripts = wrap_api(schema, base_url, api_name)
+
+    for filename, code in scripts.items():
+        with open(output_file_loc + filename, "w") as f:
+            f.write(code)
